@@ -1,0 +1,35 @@
+{
+  "name": "vector-frontend",
+  "version": "1.0.2",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "NEXT_TELEMETRY_DISABLED=1 next dev",
+    "build": "NEXT_TELEMETRY_DISABLED=1 next build",
+    "start": "NEXT_TELEMETRY_DISABLED=1 next start",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@types/sortablejs": "^1.15.9",
+    "next": "^16.4.0",
+    "react": "^19.3.0",
+    "react-dom": "^19.3.0",
+    "react-syntax-highlighter": "^16.1.1",
+    "sharp": "^0.35.5",
+    "sonner": "^2.0.7",
+    "sortablejs": "^1.15.7"
+  },
+  "devDependencies": {
+    "@types/node": "^20.19.17",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "@types/react-syntax-highlighter": "^15.5.13",
+    "typescript": "^5.9.3"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "overrides": {
+    "postcss": "^8.5.10"
+  }
+}
