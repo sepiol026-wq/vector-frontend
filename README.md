@@ -32,7 +32,7 @@ npm start
 
 ## Source updates
 
-The interface is exported automatically. Updates contain frontend files and a neutral snapshot message, not the upstream repository's commit history. Dependency versions are locked in `package-lock.json`; each publication is checked before upload.
+A server checks the private source repository every minute. Changed frontend snapshots are published after type checking, a production build and a production dependency audit. Export commits are signed and use a neutral message; upstream history, commit messages and revision identifiers are not copied. Dependency versions are locked in `package-lock.json`.
 
 ## Vector module
 
