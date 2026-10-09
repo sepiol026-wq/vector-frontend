@@ -43,7 +43,7 @@
 <details>
   <summary>Table of contents</summary>
   <ol>
-    <li><a href="#about-the-project">About the project</a></li>
+    <li><a href="#vector-frontend">Vector frontend</a></li>
     <li><a href="#built-with">Built with</a></li>
     <li>
       <a href="#getting-started">Getting started</a>
@@ -61,7 +61,9 @@
 </details>
 
 <!-- ABOUT THE PROJECT -->
-## About the project
+## Vector frontend
+
+> Web interface for the Vector module catalog
 
 This repository holds the frontend part of Vector, the web interface for the module catalog. That covers search, module source and revision views, ratings, comments, collections and developer pages.
 
