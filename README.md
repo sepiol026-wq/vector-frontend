@@ -140,7 +140,7 @@ The catalog is driven by a userbot module that lives in the GoyModules repositor
 <!-- LICENSE -->
 ## License
 
-Distributed under the GNU Affero General Public License v3.0. See `LICENSE` for the full text.
+Vector frontend is released under the GNU Affero General Public License v3.0. The full text is in `LICENSE`.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 
