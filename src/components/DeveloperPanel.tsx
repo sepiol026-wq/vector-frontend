@@ -656,7 +656,7 @@ function SignalSummary({ data, lang }: { data: AbuseSummary | null; lang: "ru" |
           return <circle key={item.key} cx="60" cy="60" r="50" fill="none" stroke={item.color} strokeWidth="8" pathLength="100" strokeDasharray={`${length} ${100 - length}`} strokeDashoffset={-start} transform="rotate(-90 60 60)" />;
         })}
       </svg>
-      <div><strong>{data?.total ?? "—"}</strong><small>{lang === "en" ? "suspected manipulation cases" : "подозрений на накрутку"}</small></div>
+      <div><strong>{data?.total ?? "—"}</strong><small>{lang === "en" ? "suspicions" : "подозрений"}</small></div>
     </div>
     <div className="signal-bars">
       {patterns.map(item => <div key={item.key} className="signal-bar-row">

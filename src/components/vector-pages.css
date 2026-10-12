@@ -80,7 +80,8 @@
 .signal-summary{display:grid;grid-template-columns:140px minmax(0,1fr) 120px;align-items:center;gap:24px;padding:20px 0;margin-bottom:18px;border-block:1px solid #242424}
 .signal-ring{position:relative;width:140px;height:140px}
 .signal-ring svg{width:100%;height:100%}
-.signal-ring>div{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px}
+.signal-ring>div{position:absolute;inset:20%;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:4px;text-align:center}
+.signal-ring small{max-width:100%;overflow-wrap:anywhere;line-height:1.2}
 .signal-ring strong,.signal-module-count strong{font-size:30px;color:#eee;font-weight:600;font-variant-numeric:tabular-nums}
 .signal-ring small,.signal-module-count span{color:#999;font-size:12px}
 .signal-bars{display:grid;gap:14px}
@@ -89,7 +90,7 @@
 .signal-bar-row i{grid-column:1/-1;height:4px;background:#242424;border-radius:4px;overflow:hidden}
 .signal-bar-row i span{display:block;height:100%}
 .signal-module-count{display:grid;gap:8px;padding-left:20px;border-left:1px solid #242424}
-@media(max-width:640px){.signal-summary{grid-template-columns:100px minmax(0,1fr);gap:16px}.signal-ring{width:100px;height:100px}.signal-ring strong{font-size:24px}.signal-module-count{grid-column:1/-1;border-left:0;border-top:1px solid #242424;padding:12px 0 0;display:flex;align-items:center;gap:10px}.signal-module-count strong{font-size:20px}}
+@media(max-width:640px){.signal-summary{grid-template-columns:100px minmax(0,1fr);gap:16px}.signal-ring{width:100px;height:100px}.signal-ring strong{font-size:24px}.signal-ring small{font-size:11px}.signal-module-count{grid-column:1/-1;border-left:0;border-top:1px solid #242424;padding:12px 0 0;display:flex;align-items:center;gap:10px}.signal-module-count strong{font-size:20px}}
 .vote-signals .vote-signals-count{font-size:12px}
 .vote-signals .dpr-flag-row{background:#111;border-color:#242424}
 .vote-signals .dpr-flag-meta{font-size:12px;line-height:1.5}
