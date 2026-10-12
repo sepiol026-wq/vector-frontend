@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ModalPresence } from "@/components/ModalPresence";
 import { VectorMotion } from "@/components/VectorMotion";
+import { SearchHeadline } from "@/components/SearchHeadline";
+import { searchPhrases } from "@/components/search-phrases";
 
 import { ModuleBanner } from "@/components/ModuleBanner";
 import { TagLink } from "@/components/TagLink";
@@ -118,6 +120,17 @@ export function VectorHome({ initialUser: serverUser }: { initialUser?: WebUser 
     return cookieLang === "en" ? "en" : "ru";
   }
   const [lang, setLang] = useState<"ru" | "en">("ru");
+  const [example, setExample] = useState(1);
+  useEffect(() => {
+    let previous = -1;
+    try { previous = Number(sessionStorage.getItem("vector-search-example") ?? -1); } catch {}
+    const count = searchPhrases.ru.length;
+    const next = previous >= 0 && previous < count
+      ? (previous + 1 + Math.floor(Math.random() * (count - 1))) % count
+      : Math.floor(Math.random() * count);
+    setExample(next);
+    try { sessionStorage.setItem("vector-search-example", String(next)); } catch {}
+  }, []);
   useEffect(() => {
     const syncLang = () => {
       const l = readLang();
@@ -273,12 +286,10 @@ const loadMoreRef = useRef<HTMLDivElement | null>(null); const tabMounted = useR
     {activeTab === "search" ? <>
 <section className="hero-card vector-explore">
 <div className="vector-signal" aria-hidden="true"><span className="vector-signal-word">VECTOR</span><span className="vector-signal-echo">VECTOR</span><span className="vector-signal-track" /><span className="vector-signal-track" /><span className="vector-signal-track" /><span className="vector-signal-dot" /></div>
-<div className="eyebrow">{lang === "en" ? "Module catalog" : "Каталог модулей"}</div>
-<h1>{(activeTag ? `#${activeTag}` : lang === "en" ? "Search modules" : "Поиск модулей").split(" ").map((word, index) => <span className="vector-title-word" key={index}>{word}{" "}</span>)}</h1>
-<p>{activeTag ? (lang === "en" ? "Modules with this tag." : "Модули с этим тегом.") : lang === "en" ? "Find modules, check source code, and see ratings." : "Ищите модули, смотрите исходный код и рейтинги."}</p>
+{activeTag ? <h1>#{activeTag}</h1> : <SearchHeadline lang={lang} paused={Boolean(query)} />}
 <label className={`search-glass${query ? " active" : ""}${loading ? " loading" : ""}`}>
 <span className="sg-dot" />
-<input aria-label={lang === "en" ? "Search modules, classes, developers" : "Поиск по модулям, классам, разработчикам"} aria-controls="vector-results" aria-busy={loading} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={loading ? "" : query ? `${results.length} ${lang === "en" ? "modules found" : "модулей найдено"}` : lang === "en" ? "Search modules, classes, developers…" : "Поиск по модулям, классам, разработчикам…"} autoFocus />
+<input aria-label={lang === "en" ? "Search modules, classes, developers" : "Поиск по модулям, классам, разработчикам"} aria-controls="vector-results" aria-busy={loading} value={query} onChange={(event) => setQuery(event.target.value)} placeholder={searchPhrases[lang][example]} autoFocus />
 <span className="vector-search-signal" aria-hidden="true" />
 </label>
 </section>

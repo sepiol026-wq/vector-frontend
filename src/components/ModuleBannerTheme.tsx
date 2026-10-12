@@ -39,18 +39,27 @@ function sample(image: HTMLImageElement): Palette | null {
     bins.set(key, bin);
   }
   const ranked = [...bins.values()].sort((a, b) => b.score - a.score);
-  const dominant = ranked[0];
+  const vivid = ranked.filter(bin => {
+    const channels = bin.rgb.map(value => value / bin.count);
+    const high = Math.max(...channels), low = Math.min(...channels);
+    return bin.count >= 16 && high >= 85 && (high - low) / high >= 0.3;
+  }).sort((a, b) => {
+    const score = (bin: typeof a) => {
+      const channels = bin.rgb.map(value => value / bin.count);
+      const high = Math.max(...channels), low = Math.min(...channels);
+      return Math.sqrt(bin.count) * ((high - low) / 255) ** 2;
+    };
+    return score(b) - score(a);
+  });
+  const dominant = vivid[0] ?? ranked[0];
   const base = dominant ? dominant.rgb.map(value => value / dominant.count) : [160, 160, 160];
-  const gain = Math.max(1, Math.min(2.5, 144 / Math.max(...base)));
-  const rgb = base.map(value => value * gain);
-  const alternate = ranked.find(bin => bin.count >= (dominant?.count ?? 0) * 0.12 &&
-    bin.rgb.reduce((sum, value, index) => sum + (value / bin.count - base[index]!) ** 2, 0) > 6400);
-  const secondary = alternate ? alternate.rgb.map(value => value / alternate.count) : rgb;
+  const rgb = base;
+  const secondary = rgb;
   const mix = (base: number, weight: number) => rgb.map(value => Math.round(base * (1 - weight) + value * weight));
   const color = (values: number[]) => `rgb(${values.map(Math.round).join(" ")})`;
   return {
     accent: color(mix(230, 0.32)),
-    surface: color(mix(9, 0.09)),
+    surface: color(mix(9, 0.12)),
     raised: color(mix(17, 0.13)),
     border: color(mix(36, 0.28)),
     primary: color(rgb),
