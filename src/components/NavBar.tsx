@@ -45,13 +45,12 @@ export function NavBar({ user: serverUser, tabs, backHref, lang, onUserClick }: 
         if (controller.signal.aborted || !data.user) return;
         setUser(data.user);
         window.dispatchEvent(new CustomEvent("vector-profile-updated", { detail: data }));
-        router.refresh();
       } catch {}
     };
     window.addEventListener("focus", refresh);
     document.addEventListener("visibilitychange", refresh);
     return () => { controller.abort(); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
-  }, [!!serverUser, router]);
+  }, [!!serverUser]);
   const [currentLang, setCurrentLang] = useState(lang);
 
   const navRef = useRef<HTMLElement>(null);
