@@ -656,7 +656,7 @@ function SignalSummary({ data, lang }: { data: AbuseSummary | null; lang: "ru" |
           return <circle key={item.key} cx="60" cy="60" r="50" fill="none" stroke={item.color} strokeWidth="8" pathLength="100" strokeDasharray={`${length} ${100 - length}`} strokeDashoffset={-start} transform="rotate(-90 60 60)" />;
         })}
       </svg>
-      <div><strong>{data?.total ?? "—"}</strong><small>{lang === "en" ? "signals" : "сигналов"}</small></div>
+      <div><strong>{data?.total ?? "—"}</strong><small>{lang === "en" ? "suspected manipulation cases" : "подозрений на накрутку"}</small></div>
     </div>
     <div className="signal-bars">
       {patterns.map(item => <div key={item.key} className="signal-bar-row">
@@ -664,7 +664,7 @@ function SignalSummary({ data, lang }: { data: AbuseSummary | null; lang: "ru" |
         <i><span style={{ width: `${data?.total ? data[item.key] / data.total * 100 : 0}%`, background: item.color }} /></i>
       </div>)}
     </div>
-    <div className="signal-module-count"><strong>{data?.modules ?? "—"}</strong><span>{lang === "en" ? "modules with signals" : "модулей с сигналами"}</span></div>
+    <div className="signal-module-count"><strong>{data?.modules ?? "—"}</strong><span>{lang === "en" ? "modules with suspected manipulation" : "модулей с подозрением на накрутку"}</span></div>
   </div>;
 }
 
@@ -752,7 +752,7 @@ export function DeveloperPanel({
           onMouseDown={(e) => createRipple(e)}
           onClick={() => setTab("flags")}
         >
-          {lang === "en" ? "Vote signals" : "Сигналы"}
+          {lang === "en" ? "Vote manipulation" : "Накрутка"}
           {abuseFlags.length > 0 && (
             <span className="dpr-badge">{abuseFlags.length}</span>
           )}
@@ -786,9 +786,9 @@ export function DeveloperPanel({
           </p>
         )
       ) : tab === "flags" ? (
-        <section className="vote-signals" aria-label={lang === "en" ? "Vote pattern reports" : "Сигналы голосования"}>
+        <section className="vote-signals" aria-label={lang === "en" ? "Vote manipulation" : "Накрутка"}>
           <div className="vote-signals-heading">
-            <div><h2>{lang === "en" ? "Suspected patterns" : "Подозрительные паттерны"}</h2><p>{lang === "en" ? "Unreviewed · all dates" : "Непросмотренные · за всё время"}</p></div>
+            <div><h2>{lang === "en" ? "Vote manipulation" : "Накрутка"}</h2><p>{lang === "en" ? "Unreviewed · all dates" : "Непросмотренные · за всё время"}</p></div>
             <button type="button" onClick={onFetchFlags} disabled={flagsLoading}>{lang === "en" ? "Refresh" : "Обновить"}</button>
           </div>
           <SignalSummary data={flagsLoading || flagsError ? null : abuseSummary} lang={lang} />
