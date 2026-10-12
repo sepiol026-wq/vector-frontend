@@ -37,7 +37,7 @@ body :is(a,button,input,textarea,select,[tabindex]):focus-visible{outline:2px so
 .vector-home .collection-card:hover .collection-card-main{transform:translateY(-2px)}
 }
 @media(max-width:900px){.vector-signal{left:60%;opacity:.5}.vector-signal-word,.vector-signal-echo{font-size:58px;right:20px;top:24px}}
-@media(max-width:640px){.vector-signal{left:25%;opacity:.35}.vector-signal-word,.vector-signal-echo{font-size:46px;top:10px;right:16px}.vector-signal-track{top:78%;right:20px}.vector-signal-dot{top:calc(78% - 3px);right:16px}.vector-home .catalog-head{align-items:baseline}.vector-home .catalog-head>span{font-size:12px}}
+@media(max-width:640px){.vector-signal{position:relative;inset:auto;height:64px;margin-bottom:16px;opacity:1;z-index:auto}.vector-signal-word,.vector-signal-echo{font-size:42px;top:0;right:4px}.vector-signal-word{opacity:.18}.vector-signal-track{top:56px;right:8px;width:100%}.vector-signal-dot{top:53px;right:4px}.vector-home .catalog-head{align-items:baseline}.vector-home .catalog-head>span{font-size:12px}}
 @media(max-width:720px){.vector-home .stats-row>span:nth-child(2)[style]{flex-basis:90px!important;min-width:0}.vector-home .stats-metrics>span:empty:last-child{display:none}}
 @media(prefers-reduced-motion:reduce){
 .vector-home *, .vector-home *::before,.vector-home *::after{animation:none!important;transition:none!important;scroll-behavior:auto!important}

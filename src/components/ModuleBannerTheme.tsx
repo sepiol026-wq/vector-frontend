@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import "./module-banner-theme.css";
 
-type Palette = { accent: string; surface: string; raised: string; border: string; image: string };
+type Palette = { accent: string; surface: string; raised: string; border: string; primary: string; secondary: string };
 const palettes = new Map<string, { palette: Palette; expires: number }>();
 
 function bannerUrl(value: string | null | undefined): string | null {
@@ -38,17 +38,23 @@ function sample(image: HTMLImageElement): Palette | null {
     bin.rgb[0] += r; bin.rgb[1] += g; bin.rgb[2] += b;
     bins.set(key, bin);
   }
-  const dominant = [...bins.values()].sort((a, b) => b.score - a.score)[0];
-  const rgb = dominant ? dominant.rgb.map(value => value / dominant.count) : [160, 160, 160];
+  const ranked = [...bins.values()].sort((a, b) => b.score - a.score);
+  const dominant = ranked[0];
+  const base = dominant ? dominant.rgb.map(value => value / dominant.count) : [160, 160, 160];
+  const gain = Math.max(1, Math.min(2.5, 144 / Math.max(...base)));
+  const rgb = base.map(value => value * gain);
+  const alternate = ranked.find(bin => bin.count >= (dominant?.count ?? 0) * 0.12 &&
+    bin.rgb.reduce((sum, value, index) => sum + (value / bin.count - base[index]!) ** 2, 0) > 6400);
+  const secondary = alternate ? alternate.rgb.map(value => value / alternate.count) : rgb;
   const mix = (base: number, weight: number) => rgb.map(value => Math.round(base * (1 - weight) + value * weight));
-  const color = (values: number[]) => `rgb(${values.join(" ")})`;
-  const accent = mix(216, 0.42);
+  const color = (values: number[]) => `rgb(${values.map(Math.round).join(" ")})`;
   return {
-    accent: color(accent),
-    surface: color(mix(9, 0.035)),
-    raised: color(mix(17, 0.055)),
-    border: color(mix(36, 0.16)),
-    image: canvas.toDataURL("image/png"),
+    accent: color(mix(230, 0.32)),
+    surface: color(mix(9, 0.09)),
+    raised: color(mix(17, 0.13)),
+    border: color(mix(36, 0.28)),
+    primary: color(rgb),
+    secondary: color(secondary),
   };
 }
 
@@ -124,7 +130,8 @@ export function ModuleBannerTheme({ banner, scopeKey, children }: {
     "--module-surface": palette.surface,
     "--module-raised": palette.raised,
     "--module-border": palette.border,
-    "--module-atmosphere": `url("${palette.image}")`,
+    "--module-primary": palette.primary,
+    "--module-secondary": palette.secondary,
   } as CSSProperties : undefined;
 
   return <div ref={root} className="module-banner-theme" data-banner-theme={palette ? "ready" : undefined} style={style}>
