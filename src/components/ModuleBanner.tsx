@@ -25,6 +25,7 @@ export function ModuleBanner({ src, className, alt }: Props) {
   return (
     <span className={`module-banner-wrap ${className ?? ""}`}>
       <img
+        ref={(image) => { if (image?.complete && image.naturalWidth > 0 && !loaded) setLoaded(true); }}
         src={displayUrl}
         alt={alt ?? ""}
         loading="lazy"

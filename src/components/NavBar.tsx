@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createRipple } from "@/lib/ripple";
@@ -30,6 +30,48 @@ export function NavBar({ user, tabs, backHref, lang, onUserClick }: Props) {
   const router = useRouter();
   const [currentLang, setCurrentLang] = useState(lang);
   const initials = user?.display_name?.slice(0, 2).toUpperCase() ?? "?";
+  const navRef = useRef<HTMLElement>(null);
+  const indicatorRef = useRef<HTMLSpanElement>(null);
+  const previousIndicator = useRef<{ x: number; width: number } | null>(null);
+  const activeIndex = tabs.findIndex(tab => tab.active);
+  const labels = tabs.map(tab => tab.label).join("|");
+
+  useLayoutEffect(() => {
+    const nav = navRef.current;
+    const indicator = indicatorRef.current;
+    if (!nav || !indicator) return;
+    const reduced = matchMedia("(prefers-reduced-motion: reduce)");
+    let animation: Animation | undefined;
+    const update = (animate: boolean) => {
+      const selected = nav.querySelector<HTMLElement>(".gb-tab.active");
+      if (!selected) { indicator.style.opacity = "0"; previousIndicator.current = null; return; }
+      const next = { x: selected.offsetLeft, width: selected.offsetWidth };
+      const prior = previousIndicator.current;
+      if (!animate && prior?.x === next.x && prior.width === next.width && indicator.style.height === `${selected.offsetHeight}px`) return;
+      indicator.style.left = `${next.x}px`;
+      indicator.style.top = `${selected.offsetTop}px`;
+      indicator.style.width = `${next.width}px`;
+      indicator.style.height = `${selected.offsetHeight}px`;
+      indicator.style.opacity = "1";
+      nav.dataset.indicator = "ready";
+      animation?.cancel();
+      if (animate && prior && !reduced.matches && !document.hidden) {
+        animation = indicator.animate([
+          { transform: `translateX(${prior.x - next.x}px) scaleX(${prior.width / next.width})` },
+          { transform: "translateX(0) scaleX(1)" },
+        ], { duration: 360, easing: "cubic-bezier(.16,1,.3,1)" });
+      }
+      previousIndicator.current = next;
+    };
+    update(true);
+    const resize = new ResizeObserver(() => update(false));
+    resize.observe(nav);
+    nav.querySelectorAll(".gb-tab").forEach(tab => resize.observe(tab));
+    const stop = () => { if (reduced.matches || document.hidden) animation?.cancel(); };
+    document.addEventListener("visibilitychange", stop);
+    reduced.addEventListener("change", stop);
+    return () => { animation?.cancel(); resize.disconnect(); document.removeEventListener("visibilitychange", stop); reduced.removeEventListener("change", stop); };
+  }, [activeIndex, labels]);
 
   useEffect(() => {
     router.prefetch("/");
@@ -64,16 +106,17 @@ export function NavBar({ user, tabs, backHref, lang, onUserClick }: Props) {
           </Link>
         </div>
 
-        <nav className="gb-nav">
+        <nav className="gb-nav" ref={navRef} aria-label={lang === "en" ? "Navigation" : "Навигация"}>
+          <span className="gb-indicator" ref={indicatorRef} aria-hidden="true" />
           {tabs.map((t, i) => {
             const cls = `gb-tab${t.active ? " active" : ""}`;
             if (t.onClick) {
-              return <button key={i} className={cls} onMouseDown={(e) => createRipple(e)} onClick={t.onClick}>{t.label}</button>;
+              return <button key={i} className={cls} aria-current={t.active ? "page" : undefined} onMouseDown={(e) => createRipple(e)} onClick={t.onClick}>{t.label}</button>;
             }
             if (t.href) {
-              return <Link key={i} className={cls} href={t.href} prefetch>{t.label}</Link>;
+              return <Link key={i} className={cls} aria-current={t.active ? "page" : undefined} href={t.href} prefetch>{t.label}</Link>;
             }
-            return <span key={i} className={cls}>{t.label}</span>;
+            return <span key={i} className={cls} aria-current={t.active ? "page" : undefined}>{t.label}</span>;
           })}
         </nav>
 
@@ -175,6 +218,15 @@ export function NavBar({ user, tabs, backHref, lang, onUserClick }: Props) {
         }
         .gb-lang-btn:hover { color: rgba(255,255,255,.6); border-color: rgba(255,255,255,.12); }
         .gb-lang-btn.active { color: #000; background: #fff; border-color: #fff; }
+        .gb-nav { position:relative; isolation:isolate; }
+        .gb-indicator { position:absolute; pointer-events:none; z-index:-1; border-radius:999px; background:rgba(255,255,255,.08); transform-origin:left center; opacity:0; }
+        .gb-nav[data-indicator="ready"] .gb-tab.active { background:transparent; }
+        .glass-bar :is(button,a):focus-visible { outline:2px solid #d4d4d4!important; outline-offset:-2px; }
+        .glass-bar :is(.gb-tab,.gb-user,.gb-lang-btn) { transition:color .18s,background .18s,border-color .18s,transform .18s; }
+        .glass-bar :is(.gb-tab,.gb-user,.gb-lang-btn):active { transform:scale(.96); }
+        .gb-back { display:inline-flex; align-items:center; transition:transform .2s,color .2s; }
+        @media(hover:hover) and (pointer:fine) { .gb-back:hover { transform:translateX(-3px); } }
+        @media(prefers-reduced-motion:reduce) { .glass-bar *, .glass-bar *::after { animation:none!important; transition:none!important; } .glass-bar :is(.gb-tab,.gb-user,.gb-lang-btn):active,.gb-back:hover { transform:none; } }
         @media (max-width: 640px) {
            .glass-bar {
              width: 100%; min-height: 44px;

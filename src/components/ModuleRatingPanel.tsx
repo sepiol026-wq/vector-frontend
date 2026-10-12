@@ -99,14 +99,13 @@ export function ModuleRatingPanel({
           <em>{lang === "en" ? "dislike" : "диз"}</em>
         </button>
       </div>
-      {showLogin ? (
         <AuthRequiredModal
+          open={showLogin}
           title={lang === "en" ? "Sign in with Telegram" : "Войдите через Telegram"}
           description={lang === "en" ? "After sign in you can leave likes and dislikes." : "После входа можно ставить лайки и дизлайки."}
           onClose={() => setShowLogin(false)}
           lang={lang}
         />
-      ) : null}
     </>
   );
 }

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { ModalPresence } from "@/components/ModalPresence";
 import { createRipple } from "@/lib/ripple";
 import { SkeletonBar } from "@/components/Skeleton";
 import { toast } from "sonner";
@@ -104,28 +104,13 @@ export function InstallButton({ owner, moduleName, dlCommand, lang = "ru" }: Pro
         </span>
       </button>
 
-      {showModal && createPortal((
-        <div style={{
-          position: "fixed", inset: 0, zIndex: 2147483647,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          minHeight: "100dvh", overflowY: "auto",
-          background: "rgba(0,0,0,.85)", padding: "max(14px, env(safe-area-inset-top)) 14px max(14px, env(safe-area-inset-bottom))"
-        }} onClick={() => setShowModal(false)}>
-          <div style={{
-            position: "relative", width: "min(420px, 100%)",
-            border: "1px solid #1f1f1f", borderRadius: 16, padding: 22,
-            background: "#090909"
-          }} onClick={e => e.stopPropagation()}>
-            <button onMouseDown={(e) => createRipple(e)} onClick={() => setShowModal(false)} style={{
-              position: "absolute", right: 12, top: 12,
-              width: 38, height: 38, border: "1px solid #2b2b2b", borderRadius: 12,
-              background: "#0f0f0f", color: "#d4d4d4", fontSize: 24, lineHeight: 1, cursor: "pointer"
-            }}>×</button>
-            <h2 style={{ margin: "12px 52px 10px 0", fontSize: "clamp(22px, 5vw, 28px)", letterSpacing: "-.03em", color: "#fff" }}>
+      <ModalPresence open={showModal} onClose={() => { setShowModal(false); setState("idle"); }} label={lang === "en" ? "Module not installed" : "Модуль не установлен"}>
+          <div className="login-modal" onClick={e => e.stopPropagation()}>
+            <h2>
               {lang === "en" ? "Module not installed" : "Модуль не установлен"}
             </h2>
             {modalReason === "blocked" && (
-              <p style={{ color: "#f87171", lineHeight: 1.5, margin: "0 0 12px", fontSize: 13 }}>
+              <p style={{ color: "#f87171" }}>
                 {lang === "en"
                   ? "Bot can't reach you. Start a chat with the bot first:"
                   : "Бот не может вам написать. Начните диалог с ботом:"}
@@ -137,40 +122,24 @@ export function InstallButton({ owner, moduleName, dlCommand, lang = "ru" }: Pro
                 )}
               </p>
             )}
-            <p style={{ color: "#d4d4d4", lineHeight: 1.5, margin: "0 0 18px" }}>
+            <p>
               {lang === "en"
                 ? "Install the module in your userbot with this command:"
                 : "Установите модуль в юзербот этой командой:"}
             </p>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", marginBottom: 12 }}>
-              <code style={{
-                flex: 1, padding: "10px 12px", borderRadius: 10,
-                border: "1px solid rgba(255,255,255,.08)",
-                background: "rgba(255,255,255,.04)", color: "#4ade80",
-                fontSize: 13, overflowX: "auto", whiteSpace: "nowrap"
-              }}>
+            <div className="vector-command-row">
+              <code>
                 dlm https://www.0xvector.lol/modules/sepiol026-wq/Vector/source
               </code>
-              <button onMouseDown={(e) => createRipple(e)} onClick={copyDl} style={{
-                padding: "10px 14px", borderRadius: 999,
-                border: "1px solid rgba(255,255,255,.08)",
-                background: "rgba(8,8,8,.72)", color: copied ? "#4ade80" : "#d4d4d4",
-                fontSize: 13, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap"
-              }}>
+              <button onMouseDown={(e) => createRipple(e)} onClick={copyDl} style={{ color: copied ? "#4ade80" : undefined }}>
                 {copied ? (lang === "en" ? "Copied!" : "Скопировано!") : (lang === "en" ? "Copy" : "Копировать")}
               </button>
             </div>
-            <button onMouseDown={(e) => createRipple(e)} onClick={() => { setShowModal(false); setState("idle"); }} style={{
-              width: "100%", padding: "10px", borderRadius: 999,
-              border: "1px solid rgba(255,255,255,.08)",
-              background: "rgba(148,163,184,.12)", color: "#d4d4d4",
-              fontSize: 14, fontWeight: 600, cursor: "pointer"
-            }}>
+            <button className="vector-action-full" onMouseDown={(e) => createRipple(e)} onClick={() => { setShowModal(false); setState("idle"); }}>
               {lang === "en" ? "OK, installed" : "Ок, установил"}
             </button>
           </div>
-        </div>
-      ), document.body)}
+      </ModalPresence>
     </>
   );
 }

@@ -1,10 +1,11 @@
 "use client";
 
-import { createPortal } from "react-dom";
+import { ModalPresence } from "@/components/ModalPresence";
 import { createRipple } from "@/lib/ripple";
 import { TelegramLoginButton } from "@/components/TelegramLoginButton";
 
 type AuthRequiredModalProps = {
+  open?: boolean;
   title: string;
   description: string;
   lang?: "ru" | "en";
@@ -12,17 +13,14 @@ type AuthRequiredModalProps = {
 };
 
 export function AuthRequiredModal({
+  open = true,
   title,
   description,
   lang = "ru",
   onClose,
 }: AuthRequiredModalProps) {
-  if (typeof document === "undefined") {
-    return null;
-  }
-
-  return createPortal(
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
+  return (
+    <ModalPresence open={open} onClose={onClose} label={title}>
       <div className="login-modal">
         <button
           className="modal-close"
@@ -40,7 +38,6 @@ export function AuthRequiredModal({
         <p>{description}</p>
         <TelegramLoginButton compact lang={lang} />
       </div>
-    </div>,
-    document.body,
+    </ModalPresence>
   );
 }

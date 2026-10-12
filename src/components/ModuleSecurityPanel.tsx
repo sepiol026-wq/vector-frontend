@@ -459,14 +459,13 @@ export function ModuleSecurityPanel({
         </div>
       )}
       {quota ? <small className="security-quota">{formatQuota(quota, lang)}</small> : null}
-      {showLogin ? (
         <AuthRequiredModal
+          open={showLogin}
           title={lang === "en" ? "Sign in with Telegram" : "Войдите через Telegram"}
           description={lang === "en" ? "After sign in you can run module security checks." : "После входа можно запускать проверку модуля."}
           onClose={() => setShowLogin(false)}
           lang={lang}
         />
-      ) : null}
     </article>
   );
 }

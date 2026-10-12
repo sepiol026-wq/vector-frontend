@@ -1,6 +1,7 @@
 "use client";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { ModalPresence } from "@/components/ModalPresence";
+import { PrivacySelect } from "@/components/PrivacySelect";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { NavBar } from "@/components/NavBar";
@@ -112,8 +113,7 @@ export function CollectionDetailContent({
   const [editShowAuthor, setEditShowAuthor] = useState(true);
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
-  const [privacyOpen, setPrivacyOpen] = useState(false);
-  const privacyRef = useRef<HTMLDivElement>(null);
+  const [deleteError, setDeleteError] = useState("");
 
   const loadModulesPage = useCallback(
     async (page: number, append = false) => {
@@ -242,14 +242,6 @@ export function CollectionDetailContent({
     await refreshModules();
   }
 
-  useEffect(() => {
-    function onClick(e: MouseEvent) {
-      if (privacyRef.current && !privacyRef.current.contains(e.target as Node)) setPrivacyOpen(false);
-    }
-    if (privacyOpen) document.addEventListener("mousedown", onClick);
-    return () => document.removeEventListener("mousedown", onClick);
-  }, [privacyOpen]);
-
   const isOwner = !!currentUser && meta?.owner_id === currentUser;
 
   function startEditing() {
@@ -288,22 +280,26 @@ export function CollectionDetailContent({
     }
   }
 
-  function openDeleteConfirm() { setShowDeleteConfirm(true); }
-  function closeDeleteConfirm() { setShowDeleteConfirm(false); }
+  function openDeleteConfirm() { setDeleteError(""); setShowDeleteConfirm(true); }
+  function closeDeleteConfirm() { if (!deleting) setShowDeleteConfirm(false); }
 
   async function handleDelete() {
+    if (deleting) return;
+    setDeleteError("");
     setDeleting(true);
-    setShowDeleteConfirm(false);
     try {
       const r = await fetch(`/api/collections/${encodeURIComponent(slug)}`, { method: "DELETE", cache: "no-cache" });
       if (r.ok) {
         toast.success(lang === "en" ? "Collection deleted" : "Коллекция удалена");
+        setShowDeleteConfirm(false);
         router.push("/");
       } else {
         toast.error(lang === "en" ? "Failed to delete collection" : "Не удалось удалить коллекцию");
+        setDeleteError(lang === "en" ? "Failed to delete collection" : "Не удалось удалить коллекцию");
       }
     } catch {
       toast.error(lang === "en" ? "Failed to delete collection" : "Не удалось удалить коллекцию");
+      setDeleteError(lang === "en" ? "Failed to delete collection" : "Не удалось удалить коллекцию");
     } finally { setDeleting(false); }
   }
 
@@ -441,22 +437,7 @@ export function CollectionDetailContent({
               <>
                 <div className="meta-panel-edit">
                   <span>{lang === "en" ? "Privacy" : "Приватность"}</span>
-                  <div className="custom-select" ref={privacyRef}>
-                    <button type="button" className="custom-select-trigger" onClick={() => setPrivacyOpen((o) => !o)} onMouseDown={(e) => createRipple(e)}>
-                      <span>{privacyLabel(editPrivacy)}</span>
-                      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" className={`custom-select-chevron${privacyOpen ? " open" : ""}`}><path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
-                    </button>
-                    {privacyOpen ? (
-                      <ul className="custom-select-menu">
-                        {(["public", "unlisted", "private"] as const).map((p) => (
-                          <li key={p} className={editPrivacy === p ? "active" : ""} onClick={() => { setEditPrivacy(p); setPrivacyOpen(false); }} onMouseDown={(e) => createRipple(e)}>
-                            <strong>{privacyLabel(p)}</strong>
-                            <small>{p === "public" ? (lang === "en" ? "Visible to all" : "Видна всем") : p === "unlisted" ? (lang === "en" ? "Only by direct link" : "Только по прямой ссылке") : (lang === "en" ? "Only you" : "Только вы")}</small>
-                          </li>
-                        ))}
-                      </ul>
-                    ) : null}
-                  </div>
+                  <PrivacySelect value={editPrivacy} onChange={setEditPrivacy} lang={lang} />
                 </div>
                 <div className="meta-panel-edit">
                   <label className="inline-checkbox"><input type="checkbox" checked={editShowAuthor} onChange={(e) => setEditShowAuthor(e.target.checked)} /><span>{lang === "en" ? "Show author" : "Показывать автора"}</span></label>
@@ -579,15 +560,14 @@ export function CollectionDetailContent({
       ) : null}
 
       { }
-      {showAddModules ? createPortal(
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setShowAddModules(false)}>
+      <ModalPresence open={showAddModules} onClose={() => setShowAddModules(false)} busy={addingModules} label={lang === "en" ? "Add modules to collection" : "Добавить модули в коллекцию"}>
           <div className="login-modal" onClick={(e) => e.stopPropagation()} style={{ width: "min(560px, 100%)" }}>
-            <button className="modal-close" onClick={() => setShowAddModules(false)} onMouseDown={(e) => createRipple(e)} aria-label={lang === "en" ? "Close" : "Закрыть"} type="button">×</button>
+            <button className="modal-close" disabled={addingModules} onClick={() => setShowAddModules(false)} onMouseDown={(e) => createRipple(e)} aria-label={lang === "en" ? "Close" : "Закрыть"} type="button">×</button>
             <div className="hero-topline"><span className="live-dot" /> {lang === "en" ? "Add modules to collection" : "Добавить модули в коллекцию"}</div>
-            <h2 style={{ margin: "12px 0 16px", fontSize: "clamp(24px, 5vw, 36px)" }}>{meta.name}</h2>
+            <h2>{meta.name}</h2>
             <label className={`mass-add-search${moduleSearch ? " active" : ""}${searchingModules ? " loading" : ""}`}>
               <span className="mass-add-dot" />
-              <input value={moduleSearch} onChange={(e) => { setModuleSearch(e.target.value); setSelectedNames(new Set()); }} placeholder={searchingModules ? "" : moduleSearch ? `${searchResults.length} ${lang === "en" ? "modules found" : "модулей найдено"}` : lang === "en" ? "Search modules, classes, developers…" : "Поиск по модулям, классам, разработчикам…"} autoFocus />
+              <input aria-label={lang === "en" ? "Search modules, classes, developers…" : "Поиск по модулям, классам, разработчикам…"} disabled={addingModules} value={moduleSearch} onChange={(e) => { setModuleSearch(e.target.value); setSelectedNames(new Set()); }} placeholder={searchingModules ? "" : moduleSearch ? `${searchResults.length} ${lang === "en" ? "modules found" : "модулей найдено"}` : lang === "en" ? "Search modules, classes, developers…" : "Поиск по модулям, классам, разработчикам…"} autoFocus />
             </label>
             <div className="mass-add-list">
               {moduleSearch.trim() && searchResults.length === 0 && !searchingModules ? (
@@ -595,7 +575,7 @@ export function CollectionDetailContent({
               ) : searchResults.map((m) => {
                 const sel = selectedNames.has(m.name);
                 return (
-                  <div key={m.name} className={`mass-add-row${sel ? " selected" : ""}`} onClick={() => { const next = new Set(selectedNames); sel ? next.delete(m.name) : next.add(m.name); setSelectedNames(next); }} onMouseDown={(e) => createRipple(e)}>
+                  <div key={m.name} role="checkbox" tabIndex={addingModules ? -1 : 0} aria-checked={sel} aria-disabled={addingModules} aria-label={m.name} className={`mass-add-row${sel ? " selected" : ""}`} onKeyDown={event => { if (event.key === " " || event.key === "Enter") { event.preventDefault(); event.currentTarget.click(); } }} onClick={() => { if (addingModules) return; const next = new Set(selectedNames); sel ? next.delete(m.name) : next.add(m.name); setSelectedNames(next); }} onMouseDown={(e) => createRipple(e)}>
                     <div className="mass-add-row-info"><strong>{m.name}</strong><small>{m.developer} · {m.class_name} · v{m.version}</small></div>
                     <span className={`mass-add-check${sel ? " on" : ""}`}>{sel ? <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M2 7l3.5 3.5L12 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg> : <svg width="14" height="14" viewBox="0 0 16 16" fill="none"><path d="M8 3v10M3 8h10" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>}</span>
                   </div>
@@ -606,25 +586,21 @@ export function CollectionDetailContent({
               <div className="mass-add-actions"><span>{selectedNames.size} {lang === "en" ? "selected" : "выбрано"}</span><button className="inline-btn-save" onClick={handleAddModules} onMouseDown={(e) => createRipple(e)} disabled={addingModules}>{addingModules ? <SkeletonBar width={90} height={12} radius={4} style={{ display: "inline-block", verticalAlign: "middle" }} /> : (lang === "en" ? "Add selected" : "Добавить выбранные")}</button></div>
             ) : null}
           </div>
-        </div>,
-        document.body,
-      ) : null}
+      </ModalPresence>
 
       { }
-      {showDeleteConfirm ? createPortal(
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={closeDeleteConfirm}>
-          <div className="login-modal" onClick={(e) => e.stopPropagation()} style={{ width: "min(380px, 100%)" }}>
-            <button className="modal-close" onClick={closeDeleteConfirm} onMouseDown={(e) => createRipple(e)} aria-label={lang === "en" ? "Close" : "Закрыть"} type="button">×</button>
-            <h2 style={{ margin: "12px 0 8px", fontSize: "clamp(22px, 4vw, 28px)", letterSpacing: "-.03em" }}>{lang === "en" ? "Delete collection?" : "Удалить коллекцию?"}</h2>
-            <p style={{ color: "#8b8b8b", marginBottom: 20, lineHeight: 1.5 }}>{lang === "en" ? "This action cannot be undone. All modules will be removed from this collection." : "Это действие нельзя отменить. Все модули будут удалены из коллекции."}</p>
-            <div style={{ display: "flex", gap: 10, justifyContent: "flex-end" }}>
-              <button className="inline-btn-cancel" onClick={closeDeleteConfirm} onMouseDown={(e) => createRipple(e)}>{lang === "en" ? "Cancel" : "Отмена"}</button>
+      <ModalPresence open={showDeleteConfirm} onClose={closeDeleteConfirm} busy={deleting} label={lang === "en" ? "Delete collection?" : "Удалить коллекцию?"}>
+          <div className="login-modal" onClick={(e) => e.stopPropagation()}>
+
+            <h2>{lang === "en" ? "Delete collection?" : "Удалить коллекцию?"}</h2>
+            <p>{lang === "en" ? "This action cannot be undone. All modules will be removed from this collection." : "Это действие нельзя отменить. Все модули будут удалены из коллекции."}</p>
+            <div className="vector-actions">
+              <button className="inline-btn-cancel" disabled={deleting} onClick={closeDeleteConfirm} onMouseDown={(e) => createRipple(e)}>{lang === "en" ? "Cancel" : "Отмена"}</button>
               <button className="inline-btn-danger" onClick={handleDelete} onMouseDown={(e) => createRipple(e)} disabled={deleting}>{deleting ? <SkeletonBar width={70} height={12} radius={4} style={{ display: "inline-block", verticalAlign: "middle" }} /> : (lang === "en" ? "Delete" : "Удалить")}</button>
             </div>
+            {deleteError ? <p role="alert" style={{ color: "#f87171" }}>{deleteError}</p> : null}
           </div>
-        </div>,
-        document.body,
-      ) : null}
+      </ModalPresence>
     </>
   );
 }

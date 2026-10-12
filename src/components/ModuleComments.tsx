@@ -439,14 +439,13 @@ export function ModuleComments({ owner, moduleName, canPost, lang = "ru" }: { ow
           />
         ))}
       </div>
-      {showLogin ? (
         <AuthRequiredModal
+          open={showLogin}
           title={lang === "en" ? "Sign in with Telegram" : "Войдите через Telegram"}
           description={lang === "en" ? "After sign in you can post comments and replies." : "После входа можно писать комментарии и отвечать другим."}
           onClose={() => setShowLogin(false)}
           lang={lang}
         />
-      ) : null}
     </section>
   );
 }

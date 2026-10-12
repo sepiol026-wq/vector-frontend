@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { createPortal } from "react-dom";
+import { ModalPresence } from "@/components/ModalPresence";
 import { CollectionEditor } from "@/components/CollectionEditor";
 import { AuthRequiredModal } from "@/components/AuthRequiredModal";
 import { createRipple } from "@/lib/ripple";
@@ -141,7 +141,7 @@ export function AddToCollectionButton({ moduleName, owner, lang }: Props) {
       setShowEditor(false);
       toast.success(lang === "en" ? "Collection created & module added" : "Коллекция создана, модуль добавлен");
     } catch {
-      toast.error(lang === "en" ? "Failed to create" : "Ошибка создания");
+      throw new Error(lang === "en" ? "Failed to create" : "Ошибка создания");
     } finally {
       setLoading(false);
     }
@@ -160,29 +160,19 @@ export function AddToCollectionButton({ moduleName, owner, lang }: Props) {
         {lang === "en" ? "+ Add to Collection" : "+ В коллекцию"}
       </button>
 
-      {showAuth ? (
         <AuthRequiredModal
+          open={showAuth}
           title={lang === "en" ? "Sign in with Telegram" : "Войдите через Telegram"}
           description={lang === "en" ? "Sign in to manage your collections." : "Войдите, чтобы управлять коллекциями."}
           onClose={() => setShowAuth(false)}
           lang={lang}
         />
-      ) : null}
 
-      {open ? createPortal(
-        <div className="modal-backdrop" role="dialog" aria-modal="true" onClick={() => setOpen(false)}>
+      <ModalPresence open={open} onClose={() => setOpen(false)} busy={loading} label={showEditor ? (lang === "en" ? "New Collection" : "Новая коллекция") : (lang === "en" ? "Add to Collection" : "Добавить в коллекцию")}>
           <div className="login-modal" onClick={(e) => e.stopPropagation()}>
             {showEditor ? (
               <>
-                <button
-                  className="modal-close"
-                  onMouseDown={(e) => createRipple(e)}
-                  onClick={() => setShowEditor(false)}
-                  aria-label={lang === "en" ? "Back" : "Назад"}
-                  type="button"
-                >
-                  ←
-                </button>
+
                 <CollectionEditor
                   onSave={handleCreate}
                   onClose={() => setShowEditor(false)}
@@ -292,9 +282,7 @@ export function AddToCollectionButton({ moduleName, owner, lang }: Props) {
               </>
             )}
           </div>
-        </div>,
-        document.body,
-      ) : null}
+      </ModalPresence>
 
       <style>{`
         .add-to-collection-btn {
@@ -308,8 +296,8 @@ export function AddToCollectionButton({ moduleName, owner, lang }: Props) {
         }
         .collection-add-section { margin-bottom: 14px; }
         .collection-add-section-title {
-          font-size: 11px; color: #6b7280; text-transform: uppercase;
-          letter-spacing: .08em; font-weight: 700; margin-bottom: 8px;
+          font-size: 12px; color: var(--surface-muted);
+          font-weight: 500; margin-bottom: 8px;
         }
         .collection-add-list {
           margin: 12px 0; max-height: 300px; overflow-y: auto;
@@ -320,17 +308,15 @@ export function AddToCollectionButton({ moduleName, owner, lang }: Props) {
         }
         .collection-add-row {
           display: flex; align-items: center; justify-content: space-between;
-          gap: 10px; padding: 10px 12px; border-radius: 10px;
-          background: #0f0f0f; border: 1px solid #1f1f1f;
+          gap: 10px; padding: 12px 14px; border-radius: var(--surface-inset-radius);
+          background: var(--surface-field); border: 1px solid var(--surface-border);
         }
         .collection-add-row.added { border-color: rgba(74,222,128,.25); background: rgba(74,222,128,.03); }
-        .collection-add-row strong { display: block; font-size: 14px; color: #e5e7eb; }
-        .collection-add-row small { color: #8b8b8b; font-size: 11px; }
+        .collection-add-row > div { min-width: 0; }
+        .collection-add-row strong { display: block; font-size: 14px; color: var(--surface-text); }
+        .collection-add-row small { color: var(--surface-muted); font-size: 12px; }
         .collection-add-row button {
-          flex-shrink: 0; cursor: pointer; padding: 6px 14px; border-radius: 8px;
-          border: 1px solid #2b2b2b; background: #171717;
-          color: #d4d4d4; font: inherit; font-size: 12px; transition: .15s;
-          position: relative; overflow: hidden;
+          flex-shrink: 0;
         }
         .collection-add-row button:hover:not(:disabled) {
           border-color: #4ade80; color: #4ade80;
@@ -339,18 +325,7 @@ export function AddToCollectionButton({ moduleName, owner, lang }: Props) {
           border-color: #f87171; color: #f87171;
         }
         .collection-add-row button:disabled { opacity: .4; cursor: default; }
-        .collection-add-actions {
-          display: flex; gap: 10px; margin-top: 16px; justify-content: flex-end;
-        }
-        .collection-add-create-btn {
-          cursor: pointer; border: 1px solid #2b2b2b; border-radius: 10px;
-          color: #d4d4d4; background: #111; padding: 11px 15px;
-          font: inherit; font-size: 14px; transition: .15s;
-          position: relative; overflow: hidden;
-        }
-        .collection-add-create-btn:hover {
-          border-color: #3a3a3a; background: #171717; color: #fff;
-        }
+
         .collection-add-loading {
           display: flex; align-items: center; justify-content: center;
           gap: 8px; padding: 28px 0;

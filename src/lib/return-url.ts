@@ -3,7 +3,7 @@ export function safeReturnUrl(value: string | null | undefined, fallback = "/"):
 
   try {
     const decoded = decodeURIComponent(value);
-    if (!decoded.startsWith("/") || decoded.startsWith("//")) return fallback;
+    if (!decoded.startsWith("/") || decoded.startsWith("//") || /[\\\u0000-\u001f\u007f]/.test(decoded)) return fallback;
     return decoded;
   } catch {
     return fallback;
