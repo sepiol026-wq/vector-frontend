@@ -21,6 +21,7 @@ import { TagLink } from "@/components/TagLink";
 import { OfficialBadge } from "@/components/OfficialBadge";
 import { parseTags } from "@/lib/tags";
 import { NavBar } from "@/components/NavBar";
+import { ModuleBannerTheme } from "@/components/ModuleBannerTheme";
 import { TranslatableText } from "@/components/TranslatableText";
 import { resolveLang } from "@/lib/lang";
 
@@ -61,7 +62,7 @@ export async function ModuleSourceContent({ params, searchParams }: PageProps) {
   const query = (await searchParams) ?? {};
   const lang = await resolveLang(query.lang);
 
-  const { targetModule, user, revisions, ratingSummary, securityCheck, securityQuota, officialDeveloper, sourceToken } = await backend<ModuleView>(`/api/web/module-view/${encodeURIComponent(p.owner)}/${encodeURIComponent(p.module_name)}`);
+  const { targetModule, user, revisions, ratingSummary, securityCheck, securityQuota, officialDeveloper, sourceToken } = await backend<ModuleView>(`/api/web/module-view/${encodeURIComponent(p.owner)}/${encodeURIComponent(p.module_name)}?rev=${encodeURIComponent(query.rev ?? "")}`);
 
   const activeRevisionNo = revisionNumber(query.rev);
   const activeRevision = revisions.find((r) => r.revision_no === activeRevisionNo) ?? null;
@@ -98,8 +99,15 @@ export async function ModuleSourceContent({ params, searchParams }: PageProps) {
         { label: lang === "en" ? "Collections" : "Коллекции", href: "/?tab=collections" },
       ]} lang={lang} />
 
+      <ModuleBannerTheme banner={targetModule.banner} scopeKey={`${owner}/${targetModule.name}/${query.rev ?? "current"}`}>
       <section className="hero-card">
-        <div className="hero-topline"><span className="live-dot" /><span>{lang === "en" ? "Vector Module Source" : "Исходник модуля Вектор"}</span></div>
+        <nav className="module-sections" aria-label={lang === "en" ? "On this page" : "На этой странице"}>
+          <a href="#module-install">{lang === "en" ? "Install" : "Установка"}</a>
+          <a href="#module-commands">{lang === "en" ? "Commands" : "Команды"}</a>
+          <a href="#module-revisions">{lang === "en" ? "Versions" : "Версии"}</a>
+          <a href="#module-code">{lang === "en" ? "Source" : "Исходник"}</a>
+          <a href="#module-comments">{lang === "en" ? "Comments" : "Комментарии"}</a>
+        </nav>
         <div className="hero-content">
           <div>
             <ModuleBanner src={targetModule.banner} className="module-banner-hero" />
@@ -108,7 +116,10 @@ export async function ModuleSourceContent({ params, searchParams }: PageProps) {
               {officialDeveloper ? <span className="official-badge"><OfficialBadge size={15} title={lang === "en" ? "Official developer" : "Официальный разработчик"} />{lang === "en" ? "official developer" : "офиц. разработчик"}</span> : null}
             </div>
             <TranslatableText text={targetModule.description || (lang === "en" ? "Description is not added yet." : "Описание пока не добавлено.")} lang={lang} className="description" />
-            <section className="hero-commands">
+            <section id="module-install" className="module-install">
+              <InstallButton owner={owner} moduleName={targetModule.name} dlCommand={dlCommand} lang={lang} />
+            </section>
+            <section id="module-commands" className="hero-commands">
               <div className="section-heading"><span>{lang === "en" ? "Commands" : "Команды"}</span><b>{commands.length}</b></div>
               {commands.length ? <div className="command-list">{commands.map((c) => <div className="command-pill" key={c.cmd}><code>{c.is_placeholder ? `{${c.cmd}}` : c.is_inline ? `@bot ${c.cmd}` : `.${c.cmd}`}</code> <TranslatableText text={localizedDesc(c, lang) || (lang === "en" ? "No description" : "Без описания")} lang={lang} /></div>)}</div> : <p className="muted">{lang === "en" ? "No commands found." : "Команды не найдены."}</p>}
             </section>
@@ -133,30 +144,26 @@ export async function ModuleSourceContent({ params, searchParams }: PageProps) {
         <ModuleSecurityPanel owner={owner} moduleName={targetModule.name} initialCheck={securityCheck} initialQuota={securityQuota} canCheck={Boolean(user)} lang={lang} />
       </section>
 
-      <section className="glass-card" style={{ maxWidth: "1180px", margin: "0 auto 22px" }}>
+      <section id="module-revisions" className="glass-card" style={{ maxWidth: "1180px", margin: "0 auto 22px" }}>
         <div className="section-heading">
-          <span>{lang === "en" ? "Revision history" : "История версий"}</span>
+          <span>{lang === "en" ? "Source revisions" : "Ревизии исходника"}</span>
           <b>{revisions.length}</b>
         </div>
         <ModuleDiff
           owner={owner}
           name={targetModule.name}
           lang={lang}
-          revisions={revisions.map((rev) => ({ id: rev.id, revision_no: rev.revision_no, created_at_label: formatDate(rev.created_at, lang) }))}
+          revisions={revisions.map((rev) => ({ id: rev.id, revision_no: rev.revision_no, source_hash: rev.source_hash, created_at_label: formatDate(rev.created_at, lang) }))}
+          currentHash={targetModule.source_hash}
+          currentDate={formatDate(targetModule.updated_at, lang)}
           viewedRevision={activeRevision?.revision_no ?? null}
           initialDiff={initialDiff}
         />
       </section>
 
       { }
-      <section className="glass-card" style={{ maxWidth: "1180px", margin: "0 auto 22px" }}>
-        <div className="section-heading">
-          <span>{lang === "en" ? "Install" : "Установка"}</span>
-        </div>
-        <InstallButton owner={owner} moduleName={targetModule.name} dlCommand={dlCommand} lang={lang} />
-      </section>
 
-      <section className="code-card">
+      <section id="module-code" className="code-card">
         <div className="code-toolbar">
           <div className="code-window-controls" aria-hidden="true"><span className="window-dot red" /><span className="window-dot yellow" /><span className="window-dot green" /></div>
           <div className="code-title">{lang === "en" ? "Source code" : "Исходный код"} · {lineCount} {lang === "en" ? "lines" : "строк"} · {codeSize} {lang === "en" ? "bytes" : "байт"}</div>
@@ -165,7 +172,8 @@ export async function ModuleSourceContent({ params, searchParams }: PageProps) {
         <CodeBlock code={displayedCode} language="python" label={`${lang === "en" ? "Module source code" : "Исходный код модуля"} ${targetModule.name}`} />
       </section>
 
-      <ModuleComments owner={owner} moduleName={targetModule.name} canPost={Boolean(user)} lang={lang} />
+      <div id="module-comments"><ModuleComments owner={owner} moduleName={targetModule.name} canPost={Boolean(user)} lang={lang} /></div>
+      </ModuleBannerTheme>
     </>
   );
 }

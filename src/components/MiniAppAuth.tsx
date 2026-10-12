@@ -1,38 +1,40 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 
-export function MiniAppAuth() {
+let pending: Promise<boolean> | null = null;
+
+export function bootstrapMiniAppSession(): Promise<boolean> {
+  const tg = (window as any).Telegram?.WebApp;
+  tg?.ready();
+  if (!tg?.initData) return Promise.resolve(false);
+  pending ??= fetch("/api/auth/miniapp", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    credentials: "same-origin",
+    cache: "no-store",
+    body: JSON.stringify({ initData: tg.initData }),
+  }).then(async response => {
+    if (!response.ok || !(await response.json()).ok) throw new Error("miniapp_auth_failed");
+    return true;
+  }).finally(() => { pending = null; });
+  return pending;
+}
+
+export function MiniAppAuth({ requireSession = false }: { requireSession?: boolean }) {
+  const router = useRouter();
+  const [failed, setFailed] = useState(false);
   useEffect(() => {
-    const tg = (window as any).Telegram?.WebApp;
-    tg?.ready();
-
-    if (!tg?.initData) return;
-    if (sessionStorage.getItem("ma_auth_done")) return;
-
-    fetch("/api/me", { cache: "no-cache" })
-      .then(r => r.ok ? r.json() : null)
-      .then((d: any) => {
-        if (d?.user) {
-          sessionStorage.setItem("ma_auth_done", "1");
-          return;
-        }
-
-        return fetch("/api/auth/miniapp", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ initData: tg.initData }),
-        });
-      })
-      .then(r => r?.json ? r.json() : null)
-      .then((d: any) => {
-        if (d?.ok) {
-          sessionStorage.setItem("ma_auth_done", "1");
-          window.location.reload();
-        }
-      })
-      .catch(() => {});
-  }, []);
-
-  return null;
+    let active = true;
+    bootstrapMiniAppSession().then(authenticated => {
+      if (!active) return;
+      if (authenticated) router.refresh();
+      else if (requireSession) router.replace("/login?return_url=%2F");
+    }).catch(() => { if (active) setFailed(true); });
+    return () => { active = false; };
+  }, [requireSession, router]);
+  return <main aria-busy={!failed} style={{ minHeight: "100dvh", display: "grid", placeItems: "center" }}>
+    <div role="status">{failed ? <>Не удалось войти. Откройте приложение заново в Telegram. <a href="/login">Войти другим способом</a></> : "Vector ···"}</div>
+  </main>;
 }

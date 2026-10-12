@@ -25,7 +25,7 @@ export default async function Page({ params }: { params: Promise<{ owner: string
     { label: lang === "en" ? "Catalog" : "Каталог", href: "/" },
     { label: lang === "en" ? "Stats" : "Статистика", href: "/?tab=stats" },
     { label: lang === "en" ? "Collections" : "Коллекции", href: "/?tab=collections" }
-  ]} /><DeveloperPageClient owner={owner} developer={data.developer} official={data.official}
+  ]} /><DeveloperPageClient owner={owner} developer={data.developer} profile={data.profile ?? undefined} official={data.official}
     githubVerified={data.github_verified} initial={data.developer.trim().slice(0, 2).toUpperCase()}
     likes={data.likes} dislikes={data.dislikes} comments={data.comments} lang={lang}
     modules={data.modules.map(module => ({ ...module, tags: module.tags.join(", ") }))} /></>;

@@ -2,10 +2,11 @@ import type { Metadata } from "next";
 import { Suspense, type ReactNode } from "react";
 import { cookies } from "next/headers";
 import Script from "next/script";
-import { MiniAppAuth } from "@/components/MiniAppAuth";
+
 import { SiteTitle } from "@/components/SiteTitle";
 import { SonnerToaster } from "@/components/SonnerToaster";
 import { RouteMotion } from "@/components/RouteMotion";
+import "@/components/vector-pages.css";
 
 export async function generateMetadata(): Promise<Metadata> {
   const cookieStore = await cookies();
@@ -31,6 +32,8 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           .module-card{min-width:0;overflow-wrap:anywhere}
           .module-head>*{min-width:0}
           .search-glass input,.mass-add-search input{min-width:0}
+          :where(a,button,input,textarea,select,summary,[tabindex]):focus-visible{outline:2px solid #e5e5e5!important;outline-offset:4px}
+          @media(prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.01ms!important;animation-iteration-count:1!important;transition-duration:.01ms!important;scroll-behavior:auto!important}}
         `}</style>
         <Script
           src="https://telegram.org/js/telegram-web-app.js"
@@ -43,7 +46,6 @@ export default function RootLayout({ children }: { children: ReactNode }) {
           <SiteTitle />
           <RouteMotion />
         </Suspense>
-        <MiniAppAuth />
         <SonnerToaster />
       </body>
     </html>

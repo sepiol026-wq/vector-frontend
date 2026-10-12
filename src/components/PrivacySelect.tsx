@@ -9,18 +9,23 @@ export function PrivacySelect({ value, onChange, lang }: {
   onChange: (value: "public" | "unlisted" | "private") => void;
   lang: "ru" | "en";
 }) {
+  return <VectorSelect value={value} onChange={onChange} label={lang === "en" ? "Privacy" : "Приватность"} options={[
+    { value: "public", title: lang === "en" ? "Public" : "Публичная", detail: lang === "en" ? "Visible to all" : "Видна всем" },
+    { value: "unlisted", title: lang === "en" ? "Unlisted" : "По ссылке", detail: lang === "en" ? "Only by direct link" : "Только по прямой ссылке" },
+    { value: "private", title: lang === "en" ? "Private" : "Приватная", detail: lang === "en" ? "Only you" : "Только вы" },
+  ]} />;
+}
+
+export function VectorSelect<T extends string>({ value, onChange, label, options, showDetail = false }: {
+  value: T; onChange: (value: T) => void; label: string; showDetail?: boolean;
+  options: readonly { value: T; title: string; detail: string }[];
+}) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
   const menu = useRef<HTMLUListElement>(null);
   const mounted = useSurfacePresence(open, menu);
   const id = useId();
-  const label = lang === "en" ? "Privacy" : "Приватность";
-  const options = [
-    { value: "public", title: lang === "en" ? "Public" : "Публичная", detail: lang === "en" ? "Visible to all" : "Видна всем" },
-    { value: "unlisted", title: lang === "en" ? "Unlisted" : "По ссылке", detail: lang === "en" ? "Only by direct link" : "Только по прямой ссылке" },
-    { value: "private", title: lang === "en" ? "Private" : "Приватная", detail: lang === "en" ? "Only you" : "Только вы" },
-  ] as const;
   const close = () => { trigger.current?.focus({ preventScroll: true }); setOpen(false); };
   useLayoutEffect(() => {
     if (open && mounted) menu.current?.querySelector<HTMLElement>('[aria-selected="true"]')?.focus({ preventScroll: true });
@@ -40,7 +45,7 @@ export function PrivacySelect({ value, onChange, lang }: {
     <button ref={trigger} type="button" className="vector-select-trigger" aria-label={label} aria-haspopup="listbox" aria-expanded={open} aria-controls={mounted ? id : undefined}
       onMouseDown={createRipple} onClick={() => setOpen(value => !value)}
       onKeyDown={event => { if (event.key === "ArrowDown" || event.key === "ArrowUp") { event.preventDefault(); setOpen(true); } }}>
-      <span>{options.find(option => option.value === value)?.title}</span>
+      <span>{options.find(option => option.value === value)?.title}{showDetail ? <small>{options.find(option => option.value === value)?.detail}</small> : null}</span>
       <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true" style={{ transform: open ? "rotate(180deg)" : undefined }}><path d="M3 5l3 3 3-3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
     </button>
     {mounted ? <ul ref={menu} id={id} className="vector-menu" role="listbox" aria-label={label} data-state={open ? "open" : "closing"} inert={!open} aria-hidden={!open || undefined}

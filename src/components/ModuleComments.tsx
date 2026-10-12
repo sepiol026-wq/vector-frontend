@@ -1,6 +1,8 @@
 "use client";
+import { UserAvatar } from "@/components/UserAvatar";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { disintegrateComment } from "@/components/comment-disintegration";
 import { sanitizeHtml } from "@/lib/safe-html";
 import { AuthRequiredModal } from "@/components/AuthRequiredModal";
 import { OfficialBadge } from "@/components/OfficialBadge";
@@ -106,6 +108,14 @@ function CommentCard({
   onDelete: (id: string) => void;
   onLoginRequired: () => void;
 }) {
+  const cardRef = useRef<HTMLElement>(null);
+  const deleting = useRef(false);
+  const lifetime = useRef<AbortController | null>(null);
+  useEffect(() => {
+    const controller = new AbortController();
+    lifetime.current = controller;
+    return () => controller.abort();
+  }, []);
   const [replyOpen, setReplyOpen] = useState(false);
   const [editOpen, setEditOpen] = useState(false);
   const [draft, setDraft] = useState("");
@@ -199,31 +209,43 @@ function CommentCard({
   }
 
   async function deleteComment() {
+    const signal = lifetime.current?.signal;
+    if (busy || deleting.current || !comment.can_edit || !signal || signal.aborted) return;
+    deleting.current = true;
+    const card = cardRef.current;
+    const restoreFocus = card?.contains(document.activeElement);
+    const focusTarget = card?.nextElementSibling?.querySelector<HTMLElement>("button")
+      ?? card?.previousElementSibling?.querySelector<HTMLElement>("button")
+      ?? card?.closest(".comments-card")?.querySelector<HTMLElement>("textarea, .comment-login-button");
     setBusy(true);
     try {
       const response = await fetch(`/api/modules/${encodeURIComponent(owner)}/${encodeURIComponent(moduleName)}/comments/${encodeURIComponent(comment.id)}`, {
-        method: "DELETE"
+        method: "DELETE", signal
       });
-      if (!response.ok) {
-        throw new Error("delete_failed");
-      }
-      onDelete(comment.id);
-      toast.success(lang === "en" ? "Comment deleted" : "Комментарий удалён");
+      if (!response.ok) throw new Error("delete_failed");
     } catch {
-      toast.error(lang === "en" ? "Failed to delete comment" : "Не удалось удалить комментарий.");
-    } finally {
-      setBusy(false);
+      deleting.current = false;
+      if (!signal.aborted) {
+        setBusy(false);
+        toast.error(lang === "en" ? "Failed to delete comment" : "Не удалось удалить комментарий.");
+      }
+      return;
     }
+    if (signal.aborted) return;
+    if (card) {
+      card.inert = true;
+      await disintegrateComment(card, signal).catch(() => {});
+    }
+    if (signal.aborted) return;
+    onDelete(comment.id);
+    if (restoreFocus && focusTarget?.isConnected) focusTarget.focus({ preventScroll: true });
+    toast.success(lang === "en" ? "Comment deleted" : "Комментарий удалён");
   }
 
   return (
-    <article className="comment-card">
+    <article ref={cardRef} className="comment-card">
       <div className="comment-head">
-        {comment.author_photo_url ? (
-          <span className="comment-avatar" style={{ backgroundImage: `url(${comment.author_photo_url})` }} />
-        ) : (
-          <span className="comment-avatar">{comment.author_name.slice(0, 2).toUpperCase()}</span>
-        )}
+        <UserAvatar className="comment-avatar" user={{ display_name: comment.author_name, photo_url: comment.author_photo_url }} />
         <div>
           <strong>{comment.author_name}{comment.is_official_developer ? <OfficialBadge size={14} title={lang === "en" ? "Official developer" : "Официальный разработчик"} /> : null}</strong>
           <small>
@@ -320,8 +342,8 @@ export function ModuleComments({ owner, moduleName, canPost, lang = "ru" }: { ow
   useEffect(() => {
     const controller = new AbortController();
 
-    async function loadComments() {
-      setLoading(true);
+    async function loadComments(background = false) {
+      if (!background) setLoading(true);
       try {
         const response = await fetch(`/api/modules/${encodeURIComponent(owner)}/${encodeURIComponent(moduleName)}/comments`, {
           cache: "no-cache",
@@ -343,8 +365,10 @@ export function ModuleComments({ owner, moduleName, canPost, lang = "ru" }: { ow
     }
 
     void loadComments();
-    return () => controller.abort();
-  }, [moduleName]);
+    const refresh = () => { if (!document.hidden) void loadComments(true); };
+    window.addEventListener("vector-profile-updated", refresh);
+    return () => { controller.abort(); window.removeEventListener("vector-profile-updated", refresh); };
+  }, [owner, moduleName, lang]);
 
   async function submitComment() {
     const draft = body.trim();

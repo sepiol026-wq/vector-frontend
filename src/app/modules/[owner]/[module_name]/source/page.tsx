@@ -14,7 +14,7 @@ export { generateMetadata } from "./metadata";
 
 export default function ModuleSourcePage(props: PageProps) {
   return (
-    <main className="source-shell">
+    <main className="source-shell module-shell">
       <style>{pagecss}</style>
       <Suspense fallback={<ModuleSourceSkeleton />}>
         <ModuleSourceContent params={props.params} searchParams={props.searchParams} />

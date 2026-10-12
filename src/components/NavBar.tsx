@@ -4,6 +4,7 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createRipple } from "@/lib/ripple";
+import { UserAvatar } from "@/components/UserAvatar";
 
 type WebUser = {
   display_name: string;
@@ -26,10 +27,33 @@ type Props = {
   onUserClick?: () => void;
 };
 
-export function NavBar({ user, tabs, backHref, lang, onUserClick }: Props) {
+export function NavBar({ user: serverUser, tabs, backHref, lang, onUserClick }: Props) {
   const router = useRouter();
+  const [user, setUser] = useState(serverUser);
+  useEffect(() => { setUser(serverUser); }, [serverUser]);
+  useEffect(() => {
+    if (!serverUser) return;
+    const controller = new AbortController();
+    let last = 0;
+    const refresh = async () => {
+      if (document.hidden || Date.now() - last < 60_000) return;
+      last = Date.now();
+      try {
+        const response = await fetch("/api/me", { cache: "no-store", signal: controller.signal });
+        if (!response.ok) return;
+        const data = await response.json();
+        if (controller.signal.aborted || !data.user) return;
+        setUser(data.user);
+        window.dispatchEvent(new CustomEvent("vector-profile-updated", { detail: data }));
+        router.refresh();
+      } catch {}
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => { controller.abort(); window.removeEventListener("focus", refresh); document.removeEventListener("visibilitychange", refresh); };
+  }, [!!serverUser, router]);
   const [currentLang, setCurrentLang] = useState(lang);
-  const initials = user?.display_name?.slice(0, 2).toUpperCase() ?? "?";
+
   const navRef = useRef<HTMLElement>(null);
   const indicatorRef = useRef<HTMLSpanElement>(null);
   const previousIndicator = useRef<{ x: number; width: number } | null>(null);
@@ -127,11 +151,7 @@ export function NavBar({ user, tabs, backHref, lang, onUserClick }: Props) {
           </div>
           {user ? (
             <button className="gb-user" onMouseDown={(e) => createRipple(e)} onClick={() => onUserClick ? onUserClick() : router.push(`/?tab=profile`)}>
-              {user.photo_url ? (
-                <span className="gb-avatar" style={{ backgroundImage: `url(${user.photo_url})` }} />
-              ) : (
-                <span className="gb-avatar gb-avatar-fallback">{initials}</span>
-              )}
+              <UserAvatar user={user} className="gb-avatar" />
               <span className="gb-username">@{user.username ?? user.display_name}</span>
             </button>
           ) : null}

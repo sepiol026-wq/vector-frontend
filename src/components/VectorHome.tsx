@@ -11,17 +11,19 @@ import { ModuleBanner } from "@/components/ModuleBanner";
 import { TagLink } from "@/components/TagLink";
 import { CollectionCard } from "@/components/CollectionCard";
 import { NavBar } from "@/components/NavBar";
+import { UserAvatar } from "@/components/UserAvatar";
 import { CollectionEditor } from "@/components/CollectionEditor";
 import { AuthRequiredModal } from "@/components/AuthRequiredModal";
 import { CommentIcon, DislikeIcon, LikeIcon, ScoreIcon } from "@/components/RatingIcons";
 import { OfficialBadge, OFFICIAL_BADGE_CSS } from "@/components/OfficialBadge";
 import { SkeletonBar } from "@/components/Skeleton";
+import { ScanQuota, type SecurityQuota } from "@/components/ScanQuota";
 import { createRipple } from "@/lib/ripple";
 import { toast } from "sonner";
 
 type WebUser = { id: string; telegram_id: string; username: string | null; first_name: string | null; last_name: string | null; photo_url: string | null; display_name: string; };
 type ModuleCard = { id: string; name: string; class_name: string; developer: string; description: string; locales?: Record<string,string>; banner: string | null; version: string; likes: number; dislikes: number; comments_count?: number; score?: number; source_owner: string; source_url: string; source_raw_url?: string; source_download_url?: string; is_official_developer?: boolean; developer_badge?: "official" | null; tags?: string[]; };
-type SecurityQuota = { limit: number; used: number; remaining: number; day_key: string; reset_at: string; };
+
 type ProfileRating = { action: "like" | "dislike"; module: ModuleCard; source_url: string; };
 type DevStat = { author: string; display_name: string; likes: number; dislikes: number; is_official_developer?: boolean; };
 type CollectionListRow = { id: string; slug: string; name: string; description: string; privacy: "public" | "unlisted" | "private"; show_author: boolean; created_at: string; updated_at: string; _count: { modules: number }; owner: { telegram_id: string }; };
@@ -100,7 +102,14 @@ function ModulePreview({ module, lang }: { module: ModuleCard; lang: "ru" | "en"
 </>;
 }
 
-export function VectorHome({ initialUser }: { initialUser?: WebUser }) {
+export function VectorHome({ initialUser: serverUser }: { initialUser?: WebUser }) {
+  const [initialUser, setInitialUser] = useState(serverUser);
+  useEffect(() => { setInitialUser(serverUser); }, [serverUser]);
+  useEffect(() => {
+    const update = (event: Event) => { const data = (event as CustomEvent).detail; if (data?.user) { setInitialUser(data.user); setGithubUsername(data.github_username ?? null); setGithubVerified(data.github_verified ?? false); setIsOfficialDev(data.is_official_developer ?? false); } };
+    window.addEventListener("vector-profile-updated", update);
+    return () => window.removeEventListener("vector-profile-updated", update);
+  }, []);
   function readLang(): "ru" | "en" {
     if (typeof window === "undefined") return "ru";
     const urlLang = new URLSearchParams(window.location.search).get("lang");
@@ -141,6 +150,8 @@ const pushSeenIds = (ids: string[]) => {
 };
 const loadMoreRef = useRef<HTMLDivElement | null>(null); const tabMounted = useRef(false);
     const [userCollections, setUserCollections] = useState<UserCollection[]>([]); const [showCollectionEditor, setShowCollectionEditor] = useState(false); const [githubUsername, setGithubUsername] = useState<string | null>(null); const [githubVerified, setGithubVerified] = useState(false); const [isOfficialDev, setIsOfficialDev] = useState(false); const [githubModules, setGithubModules] = useState<ModuleCard[]>([]); const [githubModulesLoading, setGithubModulesLoading] = useState(false); const [profileKey, setProfileKey] = useState(0);
+  const [quotaLoading, setQuotaLoading] = useState(true);
+  const [quotaError, setQuotaError] = useState(false);
   const [showUnlinkGithub, setShowUnlinkGithub] = useState(false);
   const [unlinkingGithub, setUnlinkingGithub] = useState(false);
   const unlinkTriggerRef = useRef<HTMLButtonElement>(null);
@@ -149,7 +160,7 @@ const loadMoreRef = useRef<HTMLDivElement | null>(null); const tabMounted = useR
     if (activeTab !== "profile") { setShowUnlinkGithub(false); setShowCollectionEditor(false); }
   }, [activeTab]);
   const router = useRouter();
-  const initials = useMemo(() => initialUser?.display_name?.slice(0, 2).toUpperCase() ?? "?", [initialUser?.display_name]);
+
   useEffect(() => { const interval = window.setInterval(async () => { try { const response = await fetch("/api/me", { cache: "no-cache" }); if (response.status === 418) window.location.href = "/banned"; } catch {} }, 12000); return () => window.clearInterval(interval); }, []);
    useEffect(() => { queueMicrotask(() => { const wa = (window as any).Telegram?.WebApp; if (wa?.initData) setIsInMiniApp(true); const sp = new URLSearchParams(window.location.search); const linked = sp.get("github_linked"); const err = sp.get("error"); if (linked || err) { sp.delete("github_linked"); sp.delete("error"); const u = window.location.pathname + (sp.toString() ? "?" + sp.toString() : ""); window.history.replaceState({}, "", u); if (linked) { setActiveTab("profile"); setGithubUsername(linked); setGithubVerified(true); setProfileKey(k => k + 1); toast.success(lang === "en" ? "GitHub connected" : "GitHub подключён"); } if (err) { const msgs: Record<string,string> = { github_already_linked: lang === "en" ? "GitHub already linked to another profile" : "GitHub уже привязан к другому профилю", token_exchange_failed: lang === "en" ? "OAuth failed" : "Ошибка OAuth", github_not_configured: lang === "en" ? "GitHub integration not configured" : "Интеграция GitHub не настроена", }; toast.error(msgs[err] || err); } } }); }, [lang]);
   useEffect(() => {
@@ -179,7 +190,7 @@ const loadMoreRef = useRef<HTMLDivElement | null>(null); const tabMounted = useR
   useEffect(() => { if (activeTag) { setActiveTab("search"); setQuery(""); } }, [activeTag]);
   useEffect(() => { if (activeTab === "stats" && devStats.length === 0) { setStatsLoading(true); void (async () => { try { const r = await fetch("/api/devstats", { cache: "no-cache" }); if (r.ok) setDevStats((await r.json()) as DevStat[]); } finally { setStatsLoading(false); } })(); } }, [activeTab, devStats.length]);
   useEffect(() => { if (activeTab === "collections" && !pubColReady) { fetchPubCollections(); } if (activeTab === "collections" && userCollections.length === 0) { fetchMyCollections(); } }, [activeTab, pubColReady, userCollections.length]);
-    useEffect(() => { if (activeTab !== "profile") return; setRatingsLoading(true); void (async () => { try { const r = await fetch("/api/me", { cache: "no-cache" }); if (r.ok) { const d = (await r.json()) as { security_quota: SecurityQuota; github_username: string | null; github_verified: boolean; is_official_developer: boolean; ratings: { action: "like" | "dislike"; module: { name: string; class_name: string; developer: string; description: string; banner: string | null }; source_url: string }[] }; setSecurityQuota(d.security_quota); setGithubUsername(d.github_username ?? null); setGithubVerified(d.github_verified ?? false); setIsOfficialDev(d.is_official_developer ?? false); if (d.github_verified) { setGithubModulesLoading(true); fetch("/api/me/modules", { cache: "no-cache" }).then(mr => mr.json().then(md => { setGithubModulesLoading(false); setGithubModules((md.modules || []).map((m: any) => ({ ...m, version: m.version || "", likes: m.likes || 0, dislikes: m.dislikes || 0, source_url: `/modules/${encodeURIComponent(m.source_owner || "unknown")}/${encodeURIComponent(m.name)}/source` } as ModuleCard))); }).catch(() => setGithubModulesLoading(false))).catch(() => setGithubModulesLoading(false)); } setRatings(d.ratings.map(item => ({ action: item.action, module: { ...item.module, name: item.module.name, class_name: item.module.class_name, developer: item.module.developer, description: item.module.description, banner: item.module.banner, version: "", likes: 0, dislikes: 0, source_url: item.source_url } as ModuleCard, source_url: item.source_url } as ProfileRating))); } } finally { setRatingsLoading(false); fetchMyCollections(); } })(); }, [activeTab, profileKey]);
+    useEffect(() => { if (activeTab !== "profile") return; setRatingsLoading(true); setQuotaLoading(true); setQuotaError(false); void (async () => { try { const r = await fetch("/api/me", { cache: "no-cache" }); if (r.ok) { const d = (await r.json()) as { user?: WebUser; security_quota: SecurityQuota; github_username: string | null; github_verified: boolean; is_official_developer: boolean; ratings: { action: "like" | "dislike"; module: { name: string; class_name: string; developer: string; description: string; banner: string | null }; source_url: string }[] }; if (d.user) setInitialUser(d.user); setSecurityQuota(d.security_quota); setGithubUsername(d.github_username ?? null); setGithubVerified(d.github_verified ?? false); setIsOfficialDev(d.is_official_developer ?? false); if (d.github_verified) { setGithubModulesLoading(true); fetch("/api/me/modules", { cache: "no-cache" }).then(mr => mr.json().then(md => { setGithubModulesLoading(false); setGithubModules((md.modules || []).map((m: any) => ({ ...m, version: m.version || "", likes: m.likes || 0, dislikes: m.dislikes || 0, source_url: `/modules/${encodeURIComponent(m.source_owner || "unknown")}/${encodeURIComponent(m.name)}/source` } as ModuleCard))); }).catch(() => setGithubModulesLoading(false))).catch(() => setGithubModulesLoading(false)); } setRatings(d.ratings.map(item => ({ action: item.action, module: { ...item.module, name: item.module.name, class_name: item.module.class_name, developer: item.module.developer, description: item.module.description, banner: item.module.banner, version: "", likes: 0, dislikes: 0, source_url: item.source_url } as ModuleCard, source_url: item.source_url } as ProfileRating))); } else { setQuotaError(true); } } catch { setQuotaError(true); } finally { setQuotaLoading(false); setRatingsLoading(false); fetchMyCollections(); } })(); }, [activeTab, profileKey]);
 
   const [searchError, setSearchError] = useState(false);
   const [searchRetry, setSearchRetry] = useState(0);
@@ -344,25 +355,17 @@ const loadMoreRef = useRef<HTMLDivElement | null>(null); const tabMounted = useR
 <div className="skel-line skel-text" />
 <div className="skel-line skel-text short" />
 </div>)}</section>}</> : initialUser ? <section className="profile-grid">
-<article className="profile-card">{initialUser.photo_url ? <div className="profile-avatar" style={{ backgroundImage: `url(${initialUser.photo_url})` }} /> : <div className="profile-avatar fallback">{initials}</div>}<h2>{initialUser.display_name}</h2>
+<div className="profile-account"><article className="profile-card"><div className="profile-identity"><UserAvatar user={initialUser} className="profile-avatar" /><div><span className="profile-label">{lang === "en" ? "Profile" : "Профиль"}</span><h1>{initialUser.display_name}</h1></div></div>
 <dl>
 <div>
-<dt>Username</dt>
+<dt>{lang === "en" ? "Username" : "Имя пользователя"}</dt>
 <dd>{initialUser.username ? `@${initialUser.username}` : lang === "en" ? "not set" : "не указан"}</dd>
 </div>
 <div>
 <dt>Telegram ID</dt>
 <dd>{initialUser.telegram_id}</dd>
 </div>
-<div>
-<dt>Account ID</dt>
-<dd>{initialUser.id}</dd>
-</div>
-<div>
-<dt>{lang === "en" ? "Security scans" : "Проверки безопасности"}</dt>
-<dd>{securityQuota ? (lang === "en" ? `Used ${securityQuota.used} of ${securityQuota.limit} · ${securityQuota.remaining} left · resets ${new Date(securityQuota.reset_at).toLocaleString("en-US", { timeZone: "UTC", hour12: false })} UTC` : `Использовано ${securityQuota.used} из ${securityQuota.limit} · осталось ${securityQuota.remaining} · сброс ${new Date(securityQuota.reset_at).toLocaleString("ru-RU", { timeZone: "UTC", hour12: false })} UTC`) : <SkeletonBar width={120} height={12} radius={4} />}</dd>
-</div>
-</dl>{!isInMiniApp && <button className="logout" onMouseDown={(e) => createRipple(e)} onClick={logout}>{lang === "en" ? "Log out" : "Выйти"}</button>}</article>
+</dl><ScanQuota quota={securityQuota} lang={lang} loading={quotaLoading} error={quotaError} />{!isInMiniApp && <button className="logout" onMouseDown={(e) => createRipple(e)} onClick={logout}>{lang === "en" ? "Log out" : "Выйти"}</button>}</article>
 <article className="github-card">
 <div className="github-card-header">
 <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
@@ -372,7 +375,7 @@ const loadMoreRef = useRef<HTMLDivElement | null>(null); const tabMounted = useR
 </div>{githubVerified ? <>
 <div className="github-card-connected">
 <span className="github-card-username">@{githubUsername}{isOfficialDev ? <OfficialBadge size={16} title={lang === "en" ? "Official developer" : "Официальный разработчик"} /> : null}</span>
-<span className="github-card-badge">{isOfficialDev ? (lang === "en" ? "official" : "офиц.") : (lang === "en" ? "verified" : "подтверждён")}</span>
+{!isOfficialDev ? <span className="github-card-badge">{lang === "en" ? "verified" : "подтверждён"}</span> : null}
 <button className="github-unlink-btn" ref={unlinkTriggerRef} disabled={unlinkingGithub} onMouseDown={(e) => createRipple(e)} onClick={() => setShowUnlinkGithub(true)}>{lang === "en" ? "Unlink" : "Отвязать"}</button>
 </div>
 <a className="dev-panel-btn" onMouseDown={(e) => createRipple(e)} href="/dev">
@@ -386,8 +389,8 @@ const loadMoreRef = useRef<HTMLDivElement | null>(null); const tabMounted = useR
 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
 <path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/>
 </svg>{lang === "en" ? "Connect GitHub" : "Привязать GitHub"}</button>
-</div>}</article>
-<article className="ratings-card">
+</div>}</article></div>
+<div className="profile-activity"><article className="ratings-card">
 <div className="section-title">
 <span>{lang === "en" ? "My ratings" : "Мои оценки"}</span>
 <b>{ratingsLoading ? <SkeletonBar width={18} height={12} radius={4} /> : ratings.length}</b>
@@ -397,7 +400,7 @@ const loadMoreRef = useRef<HTMLDivElement | null>(null); const tabMounted = useR
 <span className="skel-line skel-title" />
 <span className="skel-line skel-text" />
 </span>
-</div>)}</div> : ratings.length ? <div className="profile-list" style={{ maxHeight: `${profileListLimits.ratings * 76}px` }}>{ratings.map((rating) => <a className="rating-row" href={rating.source_url} key={`${rating.module.name}-${rating.action}`}>
+</div>)}</div> : ratings.length ? <div className="profile-list">{ratings.slice(0, profileListLimits.ratings).map((rating) => <a className="rating-row" href={rating.source_url} key={`${rating.module.name}-${rating.action}`}>
 <span className="rating-icon">{rating.action === "like" ? <LikeIcon /> : <DislikeIcon />}</span>
 <div>
 <strong>{rating.module.name}</strong>
@@ -414,7 +417,7 @@ const loadMoreRef = useRef<HTMLDivElement | null>(null); const tabMounted = useR
 <span className="skel-line skel-title" />
 <span className="skel-line skel-text" />
 </span>
-</div>)}</div> : userCollections.length ? <div className="profile-list" style={{ maxHeight: `${profileListLimits.collections * 76}px` }}>{userCollections.map((col) => <a className="rating-row" href={`/collections/${col.slug}`} key={col.slug}>
+</div>)}</div> : userCollections.length ? <div className="profile-list">{userCollections.slice(0, profileListLimits.collections).map((col) => <a className="rating-row" href={`/collections/${col.slug}`} key={col.slug}>
 <div>
 <strong>{col.name}</strong>
 <small>{col._count.modules} {lang === "en" ? "modules" : "модулей"} · {col.privacy === "public" ? (lang === "en" ? "public" : "публичная") : col.privacy === "unlisted" ? (lang === "en" ? "unlisted" : "по ссылке") : lang === "en" ? "private" : "приватная"}</small>
@@ -430,12 +433,12 @@ const loadMoreRef = useRef<HTMLDivElement | null>(null); const tabMounted = useR
 <span className="skel-line skel-title" />
 <span className="skel-line skel-text" />
 </span>
-</div>)}</div> : githubModules.length ? <div className="profile-list" style={{ maxHeight: `${profileListLimits.modules * 76}px` }}>{githubModules.map((m) => <a className="rating-row" href={m.source_url} key={m.name}>
+</div>)}</div> : githubModules.length ? <div className="profile-list">{githubModules.slice(0, profileListLimits.modules).map((m) => <a className="rating-row" href={m.source_url} key={m.name}>
 <div>
 <strong>{m.name}</strong>
 <small>{m.developer} · {m.class_name}</small>
 </div>
-</a>)}</div> : <p className="empty">{lang === "en" ? "No modules found." : "Модули не найдены."}</p>}{githubModules.length > 4 ? <button className="profile-expand" onMouseDown={(e) => createRipple(e)} onClick={() => setProfileListLimits(v => ({ ...v, modules: v.modules >= githubModules.length ? 4 : Math.min(v.modules + 10, githubModules.length) }))}>{profileListLimits.modules >= githubModules.length ? (lang === "en" ? "Show less" : "Свернуть") : (lang === "en" ? `Show ${Math.min(10, githubModules.length - profileListLimits.modules)} more` : `Показать ещё ${Math.min(10, githubModules.length - profileListLimits.modules)}`)}</button> : null}</article> : null}</section> : null}
+</a>)}</div> : <p className="empty">{lang === "en" ? "No modules found." : "Модули не найдены."}</p>}{githubModules.length > 4 ? <button className="profile-expand" onMouseDown={(e) => createRipple(e)} onClick={() => setProfileListLimits(v => ({ ...v, modules: v.modules >= githubModules.length ? 4 : Math.min(v.modules + 10, githubModules.length) }))}>{profileListLimits.modules >= githubModules.length ? (lang === "en" ? "Show less" : "Свернуть") : (lang === "en" ? `Show ${Math.min(10, githubModules.length - profileListLimits.modules)} more` : `Показать ещё ${Math.min(10, githubModules.length - profileListLimits.modules)}`)}</button> : null}</article> : null}</div></section> : null}
 
 <ModalPresence open={showCollectionEditor} onClose={() => setShowCollectionEditor(false)} label={lang === "en" ? "New Collection" : "Новая коллекция"}>
 <div className="login-modal">
@@ -485,7 +488,37 @@ h2{margin:12px 0;font-size:32px} dl{display:grid;gap:8px} dl div,.profile-expand
 @media(max-width:1024px){.module-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .load-more{max-width:1240px;margin:12px auto 0;border:1px dashed #252525;border-radius:12px;padding:12px;text-align:center;color:#8c8c8c;background:#080808}
 .stats-panel{max-width:1240px;margin:0 auto}.stats-hero{max-width:1240px;margin:0 auto 14px;border:1px solid #1f1f1f;background:#090909;border-radius:16px;padding:clamp(18px,4vw,30px)}.stats-leaderboard{max-width:1240px;margin:0 auto;border:1px solid #1f1f1f;background:#090909;border-radius:14px;overflow:hidden}.stats-row{display:flex;align-items:center;gap:10px;padding:10px clamp(10px,2vw,16px);border-bottom:1px solid #161616;transition:background .15s}.stats-row:hover{background:#0d0d0d}.stats-row.top-1{background:linear-gradient(90deg,rgba(255,215,0,.07),transparent 60%)}.stats-row.top-2{background:linear-gradient(90deg,rgba(192,192,192,.05),transparent 60%)}.stats-row.top-3{background:linear-gradient(90deg,rgba(205,127,50,.05),transparent 60%)}.stats-rank{min-width:34px;height:34px;display:grid;place-items:center;font-weight:800;font-size:14px;border-radius:8px;background:#111;border:1px solid #222;color:#a3a3a3}.top-1 .stats-rank{background:rgba(255,215,0,.15);border-color:rgba(255,215,0,.3);color:#ffd700}.top-2 .stats-rank{background:rgba(192,192,192,.1);border-color:rgba(192,192,192,.25);color:#c0c0c0}.top-3 .stats-rank{background:rgba(205,127,50,.1);border-color:rgba(205,127,50,.25);color:#cd7f32}.stats-author{flex:0 0 clamp(130px,18%,180px);display:flex;align-items:center;gap:5px;min-width:0;font-weight:600;font-size:14px;color:#58a6ff;text-decoration:none}.stats-author-name{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0;flex:1 1 auto}.stats-author:hover{color:#79b8ff}.stats-bars{flex:1;display:flex;height:8px;border-radius:999px;overflow:hidden;gap:2px;background:#0a0a0a;min-width:60px}.stats-bar-like{background:linear-gradient(90deg,#4ade80,#22c55e);border-radius:999px}.stats-bar-dislike{background:linear-gradient(90deg,#f87171,#ef4444);border-radius:999px}.stats-metrics{display:flex;align-items:center;gap:2px;flex-shrink:0}.stats-metrics span{display:inline-flex;align-items:center;gap:4px;padding:4px 8px;border-radius:999px;font-size:12px;font-weight:500}.stats-likes{border:1px solid rgba(74,222,128,.25);background:rgba(74,222,128,.08);color:#4ade80}.stats-dislikes{border:1px solid rgba(248,113,113,.25);background:rgba(248,113,113,.08);color:#f87171}.stats-net{font-variant-numeric:tabular-nums;min-width:62px;justify-content:flex-end}.stats-net i{font-style:normal;color:#8a8a8a;font-size:11px;margin-left:2px}.stats-metrics svg{width:13px;height:13px}
-@media(max-width:720px){.profile-grid,.module-grid{grid-template-columns:1fr}nav{width:100%;display:grid;grid-template-columns:1fr 1fr}.stats-leaderboard{overflow:visible}.stats-author{flex:0 0 90px;font-size:12px}.stats-bars{min-width:30px}.stats-metrics{flex-wrap:wrap;justify-content:flex-end;gap:4px}.stats-metrics span{padding:3px 6px;font-size:10px}.stats-metrics svg{width:10px;height:10px}.stats-net{display:none}}.catalog-skeleton{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.skel-card,.skeleton-card{border:1px solid #1f1f1f;background:#090909;border-radius:14px;padding:12px}.skel-banner{height:110px;border-radius:10px;background:linear-gradient(90deg,#111 25%,#1a1a1a 50%,#111 75%);background-size:200% 100%;animation:skel-shimmer 1.6s ease-in-out infinite}.skel-line{height:14px;border-radius:6px;background:linear-gradient(90deg,#111 25%,#1a1a1a 50%,#111 75%);background-size:200% 100%;animation:skel-shimmer 1.6s ease-in-out infinite;margin-bottom:10px}.skel-title{width:65%;height:18px}.skel-sub{width:40%;height:12px}.skel-text{width:90%;height:12px}.skel-text.short{width:55%}@keyframes skel-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}.profile-loading{display:flex;flex-direction:column;gap:8px;margin-top:14px}.pl-card{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;background:#0d0d0d;border:1px solid #1a1a1a;animation:pl-fade .8s ease-in-out infinite alternate}.plc-icon{width:28px;height:28px;border-radius:6px;background:linear-gradient(90deg,#151515 25%,#1f1f1f 50%,#151515 75%);background-size:200% 100%;animation:skel-shimmer 1.6s ease-in-out infinite}.plc-lines{flex:1;display:flex;flex-direction:column;gap:6px}.plc-lines .skel-line{margin-bottom:0}@keyframes pl-fade{0%{opacity:.6}100%{opacity:1}}@media(max-width:1024px){.catalog-skeleton{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.catalog-skeleton{grid-template-columns:1fr}}.collection-grid{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;position:relative;z-index:1}.collection-card{border:1px solid #1f1f1f;background:#090909;border-radius:14px;padding:16px;transition:border-color .15s,transform .12s ease;-webkit-tap-highlight-color:transparent;user-select:none}.collection-card:hover{border-color:#2a2a2a}.collection-card:active{transform:scale(.97)}.collection-card-main{display:block}.collection-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.collection-head strong{font-size:18px;color:#fff}.privacy-badge{font-size:10px;padding:3px 8px;border-radius:999px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}.privacy-public{background:rgba(74,222,128,.15);color:#4ade80;border:1px solid rgba(74,222,128,.25)}.privacy-unlisted{background:rgba(250,204,21,.12);color:#facc15;border:1px solid rgba(250,204,21,.2)}.privacy-private{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.2)}.collection-card p{color:#949494;font-size:13px;line-height:1.45;min-height:55px;margin:8px 0}.collection-meta{display:flex;justify-content:space-between;align-items:center;gap:8px}.collection-meta b{color:#d4d4d4;font-size:13px}.collection-meta i{color:#8b8b8b;font-size:12px;font-style:normal}@media(max-width:1024px){.collection-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.collection-grid{grid-template-columns:1fr}}.module-tags{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 6px}.tag-pill{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500;line-height:1.5}.tag-c1{background:rgba(96,165,250,.15);color:#60a5fa}.tag-c2{background:rgba(167,139,250,.15);color:#a78bfa}.tag-c3{background:rgba(52,211,153,.15);color:#34d399}.tag-c4{background:rgba(251,146,60,.15);color:#fb923c}.tag-c5{background:rgba(244,114,182,.15);color:#f472b6}.tag-c6{background:rgba(250,204,21,.15);color:#facc15}.tag-c7{background:rgba(148,163,184,.15);color:#94a3b8}.github-card{border:1px solid #21262d;border-radius:12px;background:#0d1117;padding:18px;transition:border-color .15s}.github-card:hover{border-color:#30363d}.github-card-header{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#c9d1d9;margin-bottom:12px}.github-card-header svg{color:#8b949e}.github-card-connected{display:flex;align-items:center;gap:10px}.github-card-username{color:#58a6ff;font-size:15px;font-weight:600}.github-card-badge{font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(56,139,253,.12);color:#58a6ff;border:1px solid rgba(56,139,253,.25)}.github-unlink-btn{margin-left:auto;padding:4px 10px;border-radius:8px;border:1px solid rgba(248,113,113,.25);background:rgba(248,113,113,.08);color:#f87171;font-size:11px;font-weight:500;cursor:pointer;position:relative;overflow:hidden;transition:all .15s}.github-unlink-btn:hover{border-color:rgba(248,113,113,.5);background:rgba(248,113,113,.16);color:#fca5a5}.github-unlink-btn:active{transform:scale(.96)}.dev-panel-btn{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;padding:7px 14px;border-radius:8px;border:1px solid #21262d;background:#0d1117;color:#8b949e;font-size:12px;font-weight:500;text-decoration:none;position:relative;overflow:hidden;transition:.15s} .dev-panel-btn:hover{border-color:#30363d;color:#e6edf3;background:#21262d}.dev-panel-btn:active{transform:scale(.98)}.github-card-connect p{color:#8b949e;font-size:13px;line-height:1.5;margin-bottom:14px}.github-connect-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;font-size:13px;font-weight:500;cursor:pointer;position:relative;overflow:hidden;transition:all .15s}.github-connect-btn:hover{border-color:#58a6ff;background:#1f2937;color:#58a6ff}.github-connect-btn:active{transform:scale(.96)}
+@media(max-width:720px){.profile-grid,.module-grid{grid-template-columns:1fr}nav{width:100%;display:grid;grid-template-columns:1fr 1fr}.stats-leaderboard{overflow:auto}.stats-author{flex:0 0 90px;font-size:12px}.stats-bars{min-width:30px}.stats-metrics{flex-wrap:wrap;justify-content:flex-end;gap:4px}.stats-metrics span{padding:3px 6px;font-size:10px}.stats-metrics svg{width:10px;height:10px}.stats-net{display:none}}.catalog-skeleton{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}.skel-card,.skeleton-card{border:1px solid #1f1f1f;background:#090909;border-radius:14px;padding:12px}.skel-banner{height:110px;border-radius:10px;background:linear-gradient(90deg,#111 25%,#1a1a1a 50%,#111 75%);background-size:200% 100%;animation:skel-shimmer 1.6s ease-in-out infinite}.skel-line{height:14px;border-radius:6px;background:linear-gradient(90deg,#111 25%,#1a1a1a 50%,#111 75%);background-size:200% 100%;animation:skel-shimmer 1.6s ease-in-out infinite;margin-bottom:10px}.skel-title{width:65%;height:18px}.skel-sub{width:40%;height:12px}.skel-text{width:90%;height:12px}.skel-text.short{width:55%}@keyframes skel-shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}.profile-loading{display:flex;flex-direction:column;gap:8px;margin-top:14px}.pl-card{display:flex;align-items:center;gap:12px;padding:10px 12px;border-radius:10px;background:#0d0d0d;border:1px solid #1a1a1a;animation:pl-fade .8s ease-in-out infinite alternate}.plc-icon{width:28px;height:28px;border-radius:6px;background:linear-gradient(90deg,#151515 25%,#1f1f1f 50%,#151515 75%);background-size:200% 100%;animation:skel-shimmer 1.6s ease-in-out infinite}.plc-lines{flex:1;display:flex;flex-direction:column;gap:6px}.plc-lines .skel-line{margin-bottom:0}@keyframes pl-fade{0%{opacity:.6}100%{opacity:1}}@media(max-width:1024px){.catalog-skeleton{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.catalog-skeleton{grid-template-columns:1fr}}.collection-grid{max-width:1240px;margin:0 auto;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;position:relative;z-index:1}.collection-card{border:1px solid #1f1f1f;background:#090909;border-radius:14px;padding:16px;transition:border-color .15s,transform .12s ease;-webkit-tap-highlight-color:transparent;user-select:none}.collection-card:hover{border-color:#2a2a2a}.collection-card:active{transform:scale(.97)}.collection-card-main{display:block}.collection-head{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.collection-head strong{font-size:18px;color:#fff}.privacy-badge{font-size:10px;padding:3px 8px;border-radius:999px;font-weight:600;text-transform:uppercase;letter-spacing:.06em}.privacy-public{background:rgba(74,222,128,.15);color:#4ade80;border:1px solid rgba(74,222,128,.25)}.privacy-unlisted{background:rgba(250,204,21,.12);color:#facc15;border:1px solid rgba(250,204,21,.2)}.privacy-private{background:rgba(248,113,113,.12);color:#f87171;border:1px solid rgba(248,113,113,.2)}.collection-card p{color:#949494;font-size:13px;line-height:1.45;min-height:55px;margin:8px 0}.collection-meta{display:flex;justify-content:space-between;align-items:center;gap:8px}.collection-meta b{color:#d4d4d4;font-size:13px}.collection-meta i{color:#8b8b8b;font-size:12px;font-style:normal}@media(max-width:1024px){.collection-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:720px){.collection-grid{grid-template-columns:1fr}}.module-tags{display:flex;flex-wrap:wrap;gap:4px;margin:0 0 6px}.tag-pill{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:500;line-height:1.5}.tag-c1{background:rgba(96,165,250,.15);color:#60a5fa}.tag-c2{background:rgba(167,139,250,.15);color:#a78bfa}.tag-c3{background:rgba(52,211,153,.15);color:#34d399}.tag-c4{background:rgba(251,146,60,.15);color:#fb923c}.tag-c5{background:rgba(244,114,182,.15);color:#f472b6}.tag-c6{background:rgba(250,204,21,.15);color:#facc15}.tag-c7{background:rgba(148,163,184,.15);color:#94a3b8}.github-card{border:1px solid #21262d;border-radius:12px;background:#0d1117;padding:18px;transition:border-color .15s}.github-card:hover{border-color:#30363d}.github-card-header{display:flex;align-items:center;gap:8px;font-size:14px;font-weight:600;color:#c9d1d9;margin-bottom:12px}.github-card-header svg{color:#8b949e}.github-card-connected{display:flex;align-items:center;gap:10px}.github-card-username{color:#58a6ff;font-size:15px;font-weight:600}.github-card-badge{font-size:10px;padding:2px 8px;border-radius:999px;background:rgba(56,139,253,.12);color:#58a6ff;border:1px solid rgba(56,139,253,.25)}.github-unlink-btn{margin-left:auto;padding:4px 10px;border-radius:8px;border:1px solid rgba(248,113,113,.25);background:rgba(248,113,113,.08);color:#f87171;font-size:11px;font-weight:500;cursor:pointer;position:relative;overflow:hidden;transition:all .15s}.github-unlink-btn:hover{border-color:rgba(248,113,113,.5);background:rgba(248,113,113,.16);color:#fca5a5}.github-unlink-btn:active{transform:scale(.96)}.dev-panel-btn{display:flex;align-items:center;justify-content:center;gap:6px;margin-top:10px;padding:7px 14px;border-radius:8px;border:1px solid #21262d;background:#0d1117;color:#8b949e;font-size:12px;font-weight:500;text-decoration:none;position:relative;overflow:hidden;transition:.15s} .dev-panel-btn:hover{border-color:#30363d;color:#e6edf3;background:#21262d}.dev-panel-btn:active{transform:scale(.98)}.github-card-connect p{color:#8b949e;font-size:13px;line-height:1.5;margin-bottom:14px}.github-connect-btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;border-radius:8px;border:1px solid #30363d;background:#21262d;color:#c9d1d9;font-size:13px;font-weight:500;cursor:pointer;position:relative;overflow:hidden;transition:all .15s}.github-connect-btn:hover{border-color:#58a6ff;background:#1f2937;color:#58a6ff}.github-connect-btn:active{transform:scale(.96)}
+.vector-home .profile-grid{max-width:1120px;grid-template-columns:minmax(320px,380px) minmax(0,1fr);gap:20px;align-items:start;position:relative}
+.profile-account,.profile-activity{display:grid;gap:14px;min-width:0;align-content:start}
+.profile-grid .profile-card,.profile-grid .ratings-card,.profile-grid .github-card{min-width:0;padding:20px;border-color:#252525;background:#0b0b0b;border-radius:16px}
+.profile-identity{display:flex;align-items:center;gap:14px;min-width:0}
+.profile-identity>div:last-child{min-width:0}
+.profile-grid .profile-avatar{width:52px;height:52px;flex-shrink:0;border-radius:50%;border:1px solid #303030}
+.profile-label{font-size:12px;color:#a3a3a3}
+.profile-identity h1{font-size:23px;line-height:1.25;letter-spacing:-.035em;margin:5px 0 0;overflow-wrap:anywhere}
+.profile-card dl{margin:22px 0;gap:12px;font-size:13px}
+.profile-card dl div{display:flex;justify-content:space-between;gap:12px;margin:0;padding:0;border:0;border-radius:0;background:none;cursor:default;overflow:visible}
+.profile-card dt{color:#a3a3a3;flex-shrink:0}
+.profile-card dd{margin:0;color:#ededed;text-align:right;overflow-wrap:anywhere;min-width:0}
+.profile-card>.logout{margin-top:16px}
+.profile-grid .github-card-connected{flex-wrap:wrap;gap:8px}
+.profile-grid .github-card-username{overflow-wrap:anywhere;min-width:0;max-width:100%;color:#ededed}
+.profile-grid .github-card-badge{color:#b5d3bf;background:#132019;border-color:#2c4534}
+.profile-grid .github-unlink-btn{font-size:12px;padding:8px 12px}
+.profile-grid .dev-panel-btn{justify-content:flex-start;width:fit-content;max-width:100%;margin-top:16px;color:#d4d4d4;background:#151515;border-color:#303030}
+.profile-grid .github-card-header{color:#e5e5e5;margin-bottom:16px}
+.profile-grid .section-title{font-size:15px;font-weight:600;margin-bottom:12px;gap:12px}
+.profile-grid .section-title b{font-size:12px;font-weight:500;font-variant-numeric:tabular-nums;color:#b5b5b5}
+.profile-grid .empty{font-size:13px;line-height:1.5;color:#a3a3a3;margin:0}
+.profile-grid .profile-list{display:grid;gap:6px;overflow:visible}
+.profile-grid .rating-row{min-height:54px;padding:10px 12px;background:#111;border-color:#222;font-size:14px;overflow-wrap:anywhere}
+.profile-grid .rating-row:hover{border-color:#454545;background:#161616}
+.profile-grid .rating-row small{color:#a3a3a3;font-size:12px}
+.profile-grid .rating-icon{flex-shrink:0}
+.profile-grid button,.profile-grid .dev-panel-btn{min-height:44px}
+@media(min-width:1100px){.profile-activity{grid-template-columns:repeat(2,minmax(0,1fr));align-items:start}.profile-activity>article:nth-child(3){grid-column:1/-1}.profile-activity>article:nth-child(3) .profile-list{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:760px){.vector-home .profile-grid{grid-template-columns:minmax(0,1fr);gap:14px}.profile-grid .profile-card,.profile-grid .ratings-card,.profile-grid .github-card{padding:18px}.profile-identity h1{font-size:22px}.profile-card dl div{flex-wrap:wrap}.profile-grid .github-unlink-btn{margin-left:0}}
 ${OFFICIAL_BADGE_CSS}
 `}</style>
 </main>;

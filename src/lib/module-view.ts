@@ -23,6 +23,7 @@ export type ModuleView = {
     commands: ModuleCommand[];
     dependencies: string[];
     raw_code: string;
+    source_hash: string;
     raw_code_size: number | null;
     updated_at: string;
   };
@@ -30,6 +31,7 @@ export type ModuleView = {
     id: string;
     revision_no: number;
     raw_code: string;
+    source_hash: string;
     raw_code_size: number | null;
     created_at: string;
   }>;

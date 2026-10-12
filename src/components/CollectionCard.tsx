@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import { UserAvatar } from "@/components/UserAvatar";
+import { OfficialBadge } from "@/components/OfficialBadge";
 import { createRipple } from "@/lib/ripple";
 
 type CollectionCardData = {
@@ -11,7 +13,7 @@ type CollectionCardData = {
   created_at?: string;
   updated_at?: string;
   _count: { modules: number };
-  owner?: { telegram_id: string };
+  owner?: { telegram_id: string; display_name?: string; photo_url?: string | null; is_official_developer?: boolean };
 };
 
 export function CollectionCard({
@@ -59,7 +61,7 @@ export function CollectionCard({
                 : "модулей"}
           </b>
           {collection.show_author && collection.owner?.telegram_id ? (
-            <i>by tg:{collection.owner.telegram_id}</i>
+            <i style={{ display: "inline-flex", alignItems: "center", gap: 6 }}><UserAvatar size={24} user={{ display_name: collection.owner.display_name ?? `tg:${collection.owner.telegram_id}`, photo_url: collection.owner.photo_url }} />{collection.owner.display_name ?? `tg:${collection.owner.telegram_id}`}{collection.owner.is_official_developer ? <OfficialBadge size={14} /> : null}</i>
           ) : null}
         </span>
       </Link>

@@ -16,7 +16,7 @@ type PageProps = {
 
 export default function CollectionDetailPage({ params }: PageProps) {
   return (
-    <main className="source-shell">
+    <main className="source-shell collection-shell">
       <style>{shellcss}</style>
       <Suspense fallback={<CollectionDetailSkeleton />}>
         <CollectionDetailPageAsync params={params} />

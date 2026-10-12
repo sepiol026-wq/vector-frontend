@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { ModuleBanner } from "@/components/ModuleBanner";
+import { UserAvatar } from "@/components/UserAvatar";
 import { TagLink } from "@/components/TagLink";
 import { OfficialBadge, OFFICIAL_BADGE_CSS } from "@/components/OfficialBadge";
 import { LikeIcon, DislikeIcon } from "@/components/RatingIcons";
@@ -29,11 +30,13 @@ type DevComment = {
   author_name: string;
   author_username: string | null;
   author_photo_url: string | null;
+  is_official_developer?: boolean;
   module_name: string;
   module_class_name: string;
 };
 
 type Props = {
+  profile?: { display_name: string; photo_url: string | null; username: string | null };
   owner: string;
   developer: string;
   official: boolean;
@@ -46,8 +49,8 @@ type Props = {
   lang: "ru" | "en";
 };
 
-const modulesstep = 8;
-const modulesstart = 8;
+const modulesstep = 9;
+const modulesstart = 9;
 const commentsstep = 10;
 const commentsstart = 4;
 
@@ -65,33 +68,32 @@ function formatDate(value: string, lang: "ru" | "en"): string {
 }
 
 export function DeveloperPageClient(props: Props) {
-  const { owner, developer, official, githubVerified, initial, likes, dislikes, modules, comments, lang } = props;
+  const { owner, developer, official, githubVerified, likes, dislikes, modules, comments, lang } = props;
   const [modulesLimit, setModulesLimit] = useState(modulesstart);
   const [commentsLimit, setCommentsLimit] = useState(commentsstart);
-  const [avatarError, setAvatarError] = useState(false);
 
   const t = lang === "en"
     ? {
-        developer: "DEVELOPER",
+        developer: "Developer",
         verified: "Verified",
         officialDeveloper: "Official developer",
         modules: "Modules",
         likes: "Likes",
         dislikes: "Dislikes",
-        popularComments: "Popular comments",
+        popularComments: "Latest comments",
         showComments: "Show comments",
         collapse: "Show less",
         showMoreModules: "Show more modules",
         showMoreComments: "Show more comments",
       }
     : {
-        developer: "РАЗРАБОТЧИК",
+        developer: "Разработчик",
         verified: "Подтверждён",
         officialDeveloper: "Официальный разработчик",
         modules: "Модули",
         likes: "Лайки",
         dislikes: "Дизлайки",
-        popularComments: "Популярные комментарии",
+        popularComments: "Последние комментарии",
         showComments: "Показать комментарии",
         collapse: "Свернуть",
         showMoreModules: "Показать ещё модули",
@@ -106,21 +108,15 @@ export function DeveloperPageClient(props: Props) {
   const avatarUrl = `https://github.com/${encodeURIComponent(owner)}.png?size=164`;
 
   return (
-    <main style={{ minHeight: "100vh", background: "#050505", color: "#f5f5f5", padding: "clamp(20px,5vw,72px)" }}>
+    <main className="developer-shell">
       <div style={{ maxWidth: 1240, margin: "0 auto" }}>
         <section className="dp-hero">
           <div className="dp-hero-top">
-            <div className="dp-avatar">
-              {avatarError ? (
-                <span className="dp-avatar-fallback">{initial}</span>
-              ) : (
-                <img src={avatarUrl} alt={developer} width={82} height={82} onError={() => setAvatarError(true)} />
-              )}
-            </div>
+            <UserAvatar className="dp-avatar" user={props.profile ?? { display_name: developer, photo_url: owner ? avatarUrl : null }} />
             <div className="dp-identity">
               <div className="dp-eyebrow">{t.developer}</div>
               <h1 className="dp-name">
-                {developer}{" "}
+                {props.profile?.display_name ?? developer}{" "}
                 {official ? <OfficialBadge size={20} title={t.officialDeveloper} /> : githubVerified ? <span className="dp-verified" title={t.verified}>✓</span> : null}
               </h1>
               <a href={`https://github.com/${encodeURIComponent(owner)}`} target="_blank" rel="noreferrer" className="dp-github">
@@ -139,7 +135,7 @@ export function DeveloperPageClient(props: Props) {
         </section>
 
         <section className="dp-section">
-          <h2 className="dp-section-title">{t.modules}</h2>
+          <h2 className="dp-section-title">{t.modules} <span>{modules.length}</span></h2>
           <div className="dp-module-grid">
             {visibleModules.map((module) => {
               const tags = parseTags(module.tags);
@@ -148,7 +144,7 @@ export function DeveloperPageClient(props: Props) {
                   <Link
                     className="dp-module-main"
                     href={`/modules/${encodeURIComponent(owner)}/${encodeURIComponent(module.name)}/source`}
-                    prefetch
+
                   >
                     <ModuleBanner src={module.banner} className="module-banner-card" />
                     <span className="dp-module-head">
@@ -197,13 +193,9 @@ export function DeveloperPageClient(props: Props) {
               {visibleComments.map((comment) => (
                 <article key={comment.id} className="dp-comment-card">
                   <div className="dp-comment-head">
-                    {comment.author_photo_url ? (
-                      <span className="dp-comment-avatar" style={{ backgroundImage: `url(${comment.author_photo_url})` }} />
-                    ) : (
-                      <span className="dp-comment-avatar">{(comment.author_name || "?").slice(0, 2).toUpperCase()}</span>
-                    )}
+                    <UserAvatar className="dp-comment-avatar" user={{ display_name: comment.author_name, photo_url: comment.author_photo_url }} />
                     <div className="dp-comment-head-text">
-                      <strong>{comment.author_name || (lang === "en" ? "User" : "Пользователь")}</strong>
+                      <strong>{comment.author_name || (lang === "en" ? "User" : "Пользователь")}{comment.is_official_developer ? <OfficialBadge size={14} title={t.officialDeveloper} /> : null}</strong>
                       <small>
                         {comment.author_username ? `@${comment.author_username} · ` : ""}
                         {formatDate(comment.created_at, lang)}
@@ -211,9 +203,9 @@ export function DeveloperPageClient(props: Props) {
                     </div>
                   </div>
                   <p className="dp-comment-body">{comment.body}</p>
-                  <span className="dp-comment-module">
+                  <Link className="dp-comment-module" href={`/modules/${encodeURIComponent(owner)}/${encodeURIComponent(comment.module_name)}/source`}>
                     {comment.module_name} · <code>{comment.module_class_name}</code>
-                  </span>
+                  </Link>
                 </article>
               ))}
             </div>
@@ -234,11 +226,13 @@ export function DeveloperPageClient(props: Props) {
       </div>
 
       <style>{`
+        .developer-shell { min-height:100dvh; background:#000; color:#f5f5f5; padding:16px clamp(14px,3vw,30px) 40px; }
+        .developer-shell * { box-sizing:border-box; }
+        .developer-shell a { color:inherit; text-decoration:none; }
         .dp-hero {
-          padding: clamp(24px,4vw,46px);
-          border: 1px solid #292929;
-          border-radius: 22px;
-          background: linear-gradient(135deg,#111,#080808);
+          padding: 28px 0;
+          border-bottom: 1px solid #242424;
+          display:grid;grid-template-columns:minmax(0,1fr) auto;gap:24px;align-items:center;
         }
         .dp-hero-top { display: flex; gap: 20px; align-items: center; flex-wrap: wrap; }
         .dp-avatar {
@@ -248,29 +242,30 @@ export function DeveloperPageClient(props: Props) {
         }
         .dp-avatar img { width: 100%; height: 100%; object-fit: cover; display: block; }
         .dp-avatar-fallback { display: grid; place-items: center; width: 100%; height: 100%; }
-        .dp-identity { flex: 1; min-width: 220px; }
-        .dp-eyebrow { color: #929292; font-size: 12px; letter-spacing: .12em; }
-        .dp-name { margin: 7px 0; font-size: clamp(28px,5vw,48px); }
+        .dp-identity { flex: 1; min-width: 0; overflow-wrap:anywhere; }
+        .dp-eyebrow { color: #999; font-size: 13px; }
+        .dp-name { margin: 7px 0; font-size: clamp(28px,4vw,40px); letter-spacing:-.035em; line-height:1.15; }
         .dp-verified { font-size: .55em; color: #4ade80; }
         .dp-github { color: #bdbdbd; }
-        .dp-stats { display: flex; gap: 12px; margin-top: 34px; flex-wrap: wrap; }
-        .dp-stat { min-width: 130px; padding: 16px 18px; border: 1px solid #303030; border-radius: 13px; }
+        .dp-stats { display: flex; gap: 28px; flex-wrap: wrap; }
+        .dp-stat { min-width: 64px; }
         .dp-stat span { display: block; color: #999; font-size: 12px; }
         .dp-stat strong { font-size: 24px; }
         .dp-section { margin-top: 32px; }
-        .dp-section-title { margin: 0 0 16px; font-size: 22px; }
+        .dp-section-title { margin: 0 0 18px; font-size: 22px; letter-spacing:-.02em; }
+        .dp-section-title > span { color:#999;font-weight:400;font-size:15px;margin-left:8px; }
 
         .dp-module-grid {
-          display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px;
+          display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px;
         }
         .dp-module-card {
-          border: 1px solid #1f1f1f; background: #090909; border-radius: 14px; padding: 12px;
+          border: 1px solid #242424; background: #090909; border-radius: 14px; padding: 16px;min-width:0;overflow-wrap:anywhere;
           transition: transform .12s ease, box-shadow .12s ease;
         }
         .dp-module-card:hover { border-color: #2a2a2a; }
         .dp-module-main { display: block; color: inherit; text-decoration: none; }
         .dp-module-head { display: flex; justify-content: space-between; gap: 8px; }
-        .dp-module-head strong { font-size: 18px; color: #fff; }
+        .dp-module-head strong { font-size: 18px; color: #fff; min-width:0; }
         .dp-module-head em, .dp-module-class, .dp-module-desc, .dp-module-meta { color: #949494; }
         .dp-module-head em { font-style: normal; }
         .dp-module-class { font-family: ui-monospace, monospace; font-size: 12px; display: block; margin-top: 2px; }
@@ -301,8 +296,8 @@ export function DeveloperPageClient(props: Props) {
         }
         .dp-expand:hover { transform: translateY(-1px); border-color: #3a3a3a; background: #171717; color: #fff; }
 
-        .dp-comment-list { display: grid; gap: 12px; }
-        .dp-comment-card { border: 1px solid #242424; border-radius: 16px; padding: 16px; background: #101010; }
+        .dp-comment-list { display: grid; grid-template-columns:repeat(2,minmax(0,1fr));gap: 24px; }
+        .dp-comment-card { border-top: 1px solid #242424; padding: 20px 0;min-width:0; }
         .dp-comment-head { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; }
         .dp-comment-avatar {
           width: 44px; height: 44px; border-radius: 14px; display: grid; place-items: center;
@@ -317,6 +312,7 @@ export function DeveloperPageClient(props: Props) {
 
         @media (max-width: 1024px) { .dp-module-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
         @media (max-width: 720px) {
+          .dp-hero{grid-template-columns:1fr;padding:20px 0}.dp-avatar{width:64px;height:64px}.dp-stats{justify-content:space-between;gap:16px}.dp-stat strong{font-size:22px}.dp-comment-list{grid-template-columns:1fr;gap:0}
           .dp-module-grid { grid-template-columns: 1fr; }
           .dp-name { font-size: clamp(28px, 9vw, 40px); }
         }

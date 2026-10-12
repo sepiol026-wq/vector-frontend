@@ -5,6 +5,8 @@ import { PrivacySelect } from "@/components/PrivacySelect";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { NavBar } from "@/components/NavBar";
+import { UserAvatar } from "@/components/UserAvatar";
+import { OfficialBadge } from "@/components/OfficialBadge";
 import { ModuleBanner } from "@/components/ModuleBanner";
 import { TagLink } from "@/components/TagLink";
 import { parseTags } from "@/lib/tags";
@@ -39,7 +41,7 @@ type CollectionMeta = {
   created_at: string;
   updated_at: string;
   owner_id: string;
-  owner: { telegram_id: string };
+  owner: { telegram_id: string; display_name?: string; photo_url?: string | null; username?: string | null; is_official_developer?: boolean };
   _count: { modules: number };
 };
 
@@ -81,7 +83,8 @@ export function CollectionDetailContent({
     return () => window.removeEventListener("vector-lang-change", syncLang as EventListener);
   }, []);
 
-  const [meta] = useState<CollectionMeta>(initialMeta);
+  const [meta, setMeta] = useState<CollectionMeta>(initialMeta);
+  useEffect(() => { setMeta(initialMeta); }, [initialMeta]);
   const [navUser, setNavUser] = useState<NavUser | null>(null);
   const [currentUser, setCurrentUser] = useState<string | null>(null);
 
@@ -97,6 +100,7 @@ export function CollectionDetailContent({
   const [deleting, setDeleting] = useState(false);
   const [removingModule, setRemovingModule] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const [reordering, setReordering] = useState(false);
 
   const [showAddModules, setShowAddModules] = useState(false);
   const [moduleSearch, setModuleSearch] = useState("");
@@ -270,9 +274,9 @@ export function CollectionDetailContent({
         cache: "no-cache",
       });
       if (!r.ok) throw new Error("Update failed");
+      setMeta(previous => ({ ...previous, name: editName.trim(), description: editDesc.trim(), privacy: editPrivacy, show_author: editShowAuthor }));
       setEditing(false);
       toast.success(lang === "en" ? "Collection updated" : "Коллекция обновлена");
-      window.location.reload();
     } catch {
       toast.error(lang === "en" ? "Failed to save" : "Ошибка сохранения");
     } finally {
@@ -354,11 +358,37 @@ export function CollectionDetailContent({
   const modulesRef = useRef(modules);
   modulesRef.current = modules;
 
+  const saveOrder = useCallback(async (ordered: ModuleEntry[]) => {
+    setReordering(true);
+    setModules(ordered);
+    try {
+      const response = await fetch(`/api/collections/${encodeURIComponent(slug)}/modules/reorder`, {
+        method: "PATCH", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ordered_ids: ordered.map(entry => entry.module?.id).filter(Boolean) }),
+        cache: "no-cache",
+      });
+      if (!response.ok) throw new Error("Reorder failed");
+    } catch {
+      await refreshModules();
+      toast.error(lang === "en" ? "Failed to reorder modules" : "Не удалось изменить порядок");
+    } finally { setReordering(false); }
+  }, [slug, lang, refreshModules]);
+
+  function moveModule(index: number, direction: number) {
+    if (reordering || index + direction < 0 || index + direction >= modules.length) return;
+    const ordered = [...modules];
+    const current = ordered[index], target = ordered[index + direction];
+    if (!current || !target) return;
+    ordered[index] = target;
+    ordered[index + direction] = current;
+    void saveOrder(ordered);
+  }
+
   useEffect(() => {
-    if (!isOwner || !gridRef.current) return;
+    if (!isOwner || !gridRef.current || reordering) return;
     const el = gridRef.current;
     sortableRef.current = Sortable.create(el, {
-      animation: 180,
+      animation: window.matchMedia("(prefers-reduced-motion: reduce)").matches ? 0 : 180,
       easing: "cubic-bezier(0.25, 0.1, 0.25, 1)",
       draggable: ".module-card",
       delay: 300,
@@ -370,21 +400,11 @@ export function CollectionDetailContent({
         const [moved] = mods.splice(evt.oldIndex, 1);
         if (!moved) return;
         mods.splice(evt.newIndex, 0, moved);
-        setModules(mods);
-        try {
-          await fetch(`/api/collections/${encodeURIComponent(slug)}/modules/reorder`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ ordered_ids: mods.map((m) => m.module?.id ?? "").filter(Boolean) }),
-            cache: "no-cache",
-          });
-        } catch {
-          toast.error(lang === "en" ? "Failed to reorder modules" : "Не удалось изменить порядок");
-        }
+        await saveOrder(mods);
       },
     });
     return () => { sortableRef.current?.destroy(); sortableRef.current = null; };
-  }, [isOwner, slug]);
+  }, [isOwner, reordering, saveOrder]);
 
   if (notFound) {
     return (
@@ -446,7 +466,7 @@ export function CollectionDetailContent({
             ) : (
               <>
                 <div><span>{lang === "en" ? "Privacy" : "Приватность"}</span><strong>{privacyLabel(meta.privacy)}</strong></div>
-                {meta.show_author ? <div><span>{lang === "en" ? "Author" : "Автор"}</span><strong>{meta.owner.telegram_id}</strong></div> : null}
+                {meta.show_author ? <div><span>{lang === "en" ? "Author" : "Автор"}</span><strong style={{ display: "flex", alignItems: "center", gap: 8 }}><UserAvatar size={32} user={{ display_name: meta.owner.display_name ?? `tg:${meta.owner.telegram_id}`, photo_url: meta.owner.photo_url }} />{meta.owner.display_name ?? `tg:${meta.owner.telegram_id}`}{meta.owner.is_official_developer ? <OfficialBadge size={14} /> : null}</strong></div> : null}
               </>
             )}
           </div>
@@ -489,12 +509,15 @@ export function CollectionDetailContent({
 
       { }
       {modulesTotal > 0 ? (
-        <section style={{ maxWidth: 1180, margin: "0 auto 12px", display: "flex", justifyContent: "flex-end", gap: 8, alignItems: "center" }}>
+        <section className="collection-actions">
+          <h2>{lang === "en" ? "Modules" : "Модули"} <span style={{ color: "#999", fontSize: 16 }}>{modulesTotal}</span></h2>
+          <div>
           <InstallAllButton modules={modules.filter(m => m.module != null).map(m => ({ developer: m.module!.source_owner || m.module!.developer, name: m.module!.name }))} lang={lang} />
           <button onClick={handleDownloadAll} onMouseDown={(e) => createRipple(e)} className="btn-dl-collection" disabled={downloading}>
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none" style={{ marginRight: 6, verticalAlign: "middle" }}><path d="M8 2v8M4 7l4 4 4-4M2 13h12" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" /></svg>
             {downloading ? <SkeletonBar width={90} height={12} radius={4} style={{ display: "inline-block", verticalAlign: "middle" }} /> : `${lang === "en" ? "Download all" : "Скачать всё"} (${modulesTotal})`}
           </button>
+          </div>
         </section>
       ) : null}
 
@@ -519,21 +542,23 @@ export function CollectionDetailContent({
             <p className="muted">{lang === "en" ? "This collection is empty." : "Коллекция пуста."}</p>
           </div>
         ) : (
-          modules.map((entry, idx) => {
+          modules.map((entry, index) => {
             if (!entry?.module) return null;
             const m = entry.module;
             return (
               <article key={m.id} className="module-card" onMouseDown={(e) => { if (!(e.target as HTMLElement).closest("a,button")) createRipple(e); }}>
-                <Link className="module-card-main" href={m.source_url ?? `/modules/unknown/${encodeURIComponent(m.name)}/source`} prefetch={false}>
+                <Link className="module-card-main" href={m.source_url ?? `/modules/${encodeURIComponent(m.source_owner || "unknown")}/${encodeURIComponent(m.name)}/source`}>
                   <ModuleBanner src={m.banner} className="module-banner-card" />
                   <span className="module-head"><strong>{m.name}</strong><em>v{m.version}</em></span>
                   <span className="module-class">{m.class_name}</span>
                   <p>{m.description && m.description.length > 145 ? `${m.description.slice(0, 145).trim()}…` : m.description || (lang === "en" ? "Description is not added yet." : "Описание пока не добавлено.")}</p>
-                  {parseTags(m.tags).length ? <span className="module-tags">{parseTags(m.tags).map((tag, tagIndex) => <TagLink key={tag} tag={tag} index={tagIndex} onClick={(event) => event.stopPropagation()} />)}</span> : null}
                   <span className="module-meta"><b>{m.developer}</b></span>
                 </Link>
+                {parseTags(m.tags).length ? <span className="module-tags">{parseTags(m.tags).map((tag, tagIndex) => <TagLink key={tag} tag={tag} index={tagIndex} onClick={(event) => event.stopPropagation()} />)}</span> : null}
                 {isOwner ? (
                   <span className="module-actions">
+                    <button type="button" className="module-move-btn" aria-label={`${lang === "en" ? "Move up" : "Выше"}: ${m.name}`} disabled={reordering || index === 0} onClick={() => moveModule(index, -1)}>↑</button>
+                    <button type="button" className="module-move-btn" aria-label={`${lang === "en" ? "Move down" : "Ниже"}: ${m.name}`} disabled={reordering || index === modules.length - 1} onClick={() => moveModule(index, 1)}>↓</button>
                     <button onClick={() => handleRemoveModule(m.name)} onMouseDown={(e) => createRipple(e)} disabled={removingModule === m.name} className="module-remove-btn">
                       {removingModule === m.name ? <SkeletonBar width={52} height={10} radius={4} style={{ display: "inline-block", verticalAlign: "middle" }} /> : lang === "en" ? "Remove" : "Убрать"}
                     </button>

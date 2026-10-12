@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ComponentProps } from "react";
 
 type HighlighterProps = ComponentProps<
-  typeof import("react-syntax-highlighter").Prism
+  typeof import("react-syntax-highlighter/dist/esm/prism-light").default
 >;
 
 export default function CodeBlock({
@@ -19,19 +19,22 @@ export default function CodeBlock({
   const [Highlighter, setHighlighter] =
     useState<React.ComponentType<HighlighterProps> | null>(null);
   const [failed, setFailed] = useState(false);
+  const blockRef = useRef<HTMLPreElement>(null);
 
   useEffect(() => {
     let cancelled = false;
-    void (async () => {
+    const load = async () => {
       try {
-        const [mod, style] = await Promise.all([
-          import("react-syntax-highlighter"),
+        const [mod, python, style] = await Promise.all([
+          import("react-syntax-highlighter/dist/esm/prism-light"),
+          import("react-syntax-highlighter/dist/esm/languages/prism/python"),
           import(
             "react-syntax-highlighter/dist/esm/styles/prism/vsc-dark-plus"
           ),
         ]);
         if (cancelled) return;
-        const Prism = mod.Prism;
+        const Prism = mod.default;
+        Prism.registerLanguage("python", python.default);
         setHighlighter(
           () =>
             (props: HighlighterProps) =>
@@ -40,9 +43,14 @@ export default function CodeBlock({
       } catch {
         if (!cancelled) setFailed(true);
       }
-    })();
+    };
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some(entry => entry.isIntersecting)) { observer.disconnect(); void load(); }
+    }, { rootMargin: "200px" });
+    if (blockRef.current) observer.observe(blockRef.current);
     return () => {
       cancelled = true;
+      observer.disconnect();
     };
   }, []);
 
@@ -51,6 +59,8 @@ export default function CodeBlock({
   if (failed || !Highlighter) {
     return (
       <pre
+        ref={blockRef}
+        tabIndex={0}
         className="code-block"
         aria-label={label}
         style={{
@@ -85,6 +95,7 @@ export default function CodeBlock({
 
   return (
     <Highlighter
+      tabIndex={0}
       aria-label={label}
       className="code-block"
       codeTagProps={{

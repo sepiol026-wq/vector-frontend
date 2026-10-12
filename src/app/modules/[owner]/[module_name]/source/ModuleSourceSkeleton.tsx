@@ -48,7 +48,7 @@ export function ModuleSourceSkeleton() {
           {Array.from({ length: 12 }, (_, i) => (
             <div key={i} style={{ display: "flex", gap: 12, marginBottom: 10 }}>
               <div style={{ width: 28, height: 14, borderRadius: 4, background: "#151515", flexShrink: 0 }} />
-              <div style={{ width: `${40 + Math.random() * 50}%`, height: 14, borderRadius: 4, background: "#121212" }} />
+              <div style={{ width: `${[72, 45, 86, 58][i % 4]}%`, height: 14, borderRadius: 4, background: "#121212" }} />
             </div>
           ))}
         </div>

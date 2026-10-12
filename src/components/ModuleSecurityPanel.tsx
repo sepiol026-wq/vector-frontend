@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { AuthRequiredModal } from "@/components/AuthRequiredModal";
 import { SkeletonBar } from "@/components/Skeleton";
+import { ScanQuota, type SecurityQuota } from "@/components/ScanQuota";
 import { createRipple } from "@/lib/ripple";
 import { toast } from "sonner";
 
@@ -38,14 +39,6 @@ type SecurityCheck = {
   details: unknown;
   quota?: SecurityQuota;
   ai_failed?: boolean;
-};
-
-type SecurityQuota = {
-  limit: number;
-  used: number;
-  remaining: number;
-  day_key: string;
-  reset_at: string;
 };
 
 type SecurityFinding = {
@@ -118,27 +111,6 @@ function formatRisk(risk: string | undefined, lang: "ru" | "en"): string {
   if (!risk) return "—";
   const labels = getRiskLabels(lang);
   return (labels as Record<string, string>)[risk] ?? risk;
-}
-
-function formatUtcDate(value: string | Date | number | null | undefined, lang: "ru" | "en"): string {
-  if (value === null || value === undefined || value === "") return "—";
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "—";
-  return date.toLocaleString(lang === "en" ? "en-US" : "ru-RU", { timeZone: "UTC", hour12: false });
-}
-
-function formatQuota(quota: SecurityQuota, lang: "ru" | "en"): string {
-  const reset = formatUtcDate(quota.reset_at, lang);
-  return lang === "en"
-    ? `Used ${quota.used} of ${quota.limit} · ${quota.remaining} left · resets ${reset} UTC`
-    : `Использовано ${quota.used} из ${quota.limit} · осталось ${quota.remaining} · сброс ${reset} UTC`;
-}
-
-function formatQuotaRemaining(quota: SecurityQuota | null, lang: "ru" | "en"): string {
-  if (!quota) return lang === "en" ? "run an automated check" : "запустите автоматическую проверку";
-  return lang === "en"
-    ? `${quota.remaining} of ${quota.limit} checks left`
-    : `осталось ${quota.remaining} из ${quota.limit} проверок`;
 }
 
 function formatStatName(name: string): string {
@@ -333,6 +305,7 @@ export function ModuleSecurityPanel({
   const [check, setCheck] = useState<SecurityCheck | null>(initialCheck);
   const [quota, setQuota] = useState<SecurityQuota | null>(initialQuota);
   const [loading, setLoading] = useState(false);
+  const [quotaError, setQuotaError] = useState(false);
   const [showLogin, setShowLogin] = useState(false);
   const [translated, setTranslated] = useState<Record<string, string> | null>(null);
 
@@ -404,18 +377,21 @@ export function ModuleSecurityPanel({
         cache: "no-cache"
       });
       if (!response.ok) {
-        toast.error(response.status === 429 ? (lang === "en" ? "Daily check limit exhausted." : "Лимит проверок на сегодня исчерпан.") : (lang === "en" ? "Failed to check the module." : "Не удалось проверить модуль."));
+        setQuotaError(true);
+        toast.error(response.status === 429 ? (lang === "en" ? "Check limit reached. Try again later." : "Достигнут лимит запросов. Попробуйте позже.") : (lang === "en" ? "Failed to check the module." : "Не удалось проверить модуль."));
         return;
       }
       const data = (await response.json()) as { check: SecurityCheck };
       setCheck(data.check);
       setQuota(data.check.quota ?? quota);
+      setQuotaError(false);
       if (data.check.ai_failed) {
         toast.warning(lang === "en" ? "AI analysis is temporarily unavailable — showing the static analysis result only." : "AI-анализ временно недоступен — показан результат только статического анализа.");
       } else {
         toast.success(lang === "en" ? "Module checked" : "Модуль проверен");
       }
     } catch {
+      setQuotaError(true);
       toast.error(lang === "en" ? "Network unavailable, try again later." : "Сеть недоступна, попробуйте позже.");
     } finally {
       setLoading(false);
@@ -451,14 +427,14 @@ export function ModuleSecurityPanel({
           <div className="security-badge unchecked">
             <span>{lang === "en" ? "Status" : "Статус"}</span>
             <strong>{lang === "en" ? "not checked" : "не проверен"}</strong>
-            <em>{formatQuotaRemaining(quota, lang)}</em>
+
           </div>
           <button className="security-check-button" disabled={loading || (canCheck && quota?.remaining === 0)} onMouseDown={(e) => createRipple(e)} onClick={startCheck} type="button">
             {loading ? <SkeletonBar width={90} height={12} radius={4} style={{ display: "inline-block", verticalAlign: "middle" }} /> : (lang === "en" ? "Check module" : "Проверить модуль")}
           </button>
         </div>
       )}
-      {quota ? <small className="security-quota">{formatQuota(quota, lang)}</small> : null}
+      {canCheck ? <ScanQuota quota={quota} lang={lang} error={quotaError} /> : null}
         <AuthRequiredModal
           open={showLogin}
           title={lang === "en" ? "Sign in with Telegram" : "Войдите через Telegram"}
